@@ -1,0 +1,72 @@
+:root {
+  --bg: #0f1220;
+  --card: #1a1f35;
+  --accent: #4f8cff;
+  --accent2: #22c55e;
+  --danger: #ef4444;
+  --text: #eef1f8;
+  --muted: #9aa4bf;
+  font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 16px;
+}
+.wrap { max-width: 480px; margin: 0 auto; }
+h1 { font-size: 1.3rem; text-align: center; margin-bottom: 4px; }
+.subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
+label { display: block; font-size: 0.85rem; color: var(--muted); margin: 10px 0 4px; }
+input[type="text"], input[type="number"], input[type="password"] {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #2c3352;
+  background: #10152a;
+  color: var(--text);
+  font-size: 1rem;
+}
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 11px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  width: 100%;
+}
+.btn-primary { background: var(--accent); color: white; }
+.btn-win { background: var(--accent2); color: white; }
+.btn-lose { background: var(--danger); color: white; }
+.btn-secondary { background: #2c3352; color: var(--text); }
+.row-2 { display: flex; gap: 10px; }
+.row-2 button { flex: 1; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab-btn {
+  flex: 1; background: var(--card); color: var(--muted);
+  padding: 10px; border-radius: 10px; text-align: center; cursor: pointer;
+  font-size: 0.9rem; margin-top: 0;
+}
+.tab-btn.active { background: var(--accent); color: white; }
+.hidden { display: none; }
+#m-status, #t-result, #m-stake-result {
+  margin-top: 10px; font-size: 0.9rem; line-height: 1.6;
+}
+.t-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+.t-table th, .t-table td { border-bottom: 1px solid #2c3352; padding: 6px; text-align: left; }
+.t-note { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
+.lock-screen { text-align: center; padding-top: 60px; }
+.error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 8px; }
+.success-msg { color: var(--accent2); font-size: 0.85rem; margin-top: 8px; }
+footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 20px; }

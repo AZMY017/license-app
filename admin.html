@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Panel — License Manager</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <div id="login-box" class="card">
+    <h1>🔐 অ্যাডমিন লগইন</h1>
+    <label>ইমেইল</label>
+    <input type="text" id="admin-email" placeholder="আপনার অ্যাডমিন ইমেইল" />
+    <label>পাসওয়ার্ড</label>
+    <input type="password" id="admin-password" placeholder="পাসওয়ার্ড" />
+    <button class="btn-primary" onclick="adminLogin()">লগইন করুন</button>
+    <div id="login-msg"></div>
+  </div>
+
+  <div id="admin-panel" class="hidden">
+    <h1>🗝️ লাইসেন্স ম্যানেজার</h1>
+
+    <div class="card">
+      <h2 style="font-size:1rem;">নতুন কী তৈরি করুন</h2>
+      <label>কী (ফাঁকা রাখলে অটো-জেনারেট হবে)</label>
+      <input type="text" id="new-key-input" placeholder="যেমনঃ ABCD-1234" />
+      <button class="btn-primary" onclick="createKey()">নতুন কী তৈরি করুন</button>
+      <div id="create-msg"></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1rem;">সব কী-এর তালিকা</h2>
+      <button class="btn-secondary" onclick="loadKeys()">রিফ্রেশ করুন</button>
+      <div id="keys-list"></div>
+    </div>
+
+    <button class="btn-secondary" onclick="adminLogout()">লগআউট</button>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="firebase-config.js"></script>
+
+<script>
+function showMsg(id, text, ok) {
+  document.getElementById(id).innerHTML =
+    `<div class="${ok ? "success-msg" : "error-msg"}">${text}</div>`;
+}
+
+async function adminLogin() {
+  const email = document.getElementById("admin-email").value.trim();
+  const pass = document.getElementById("admin-password").value;
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch (e) {
+    showMsg("login-msg", "লগইন ব্যর্থ: " + e.message, false);
+  }
+}
+
+function adminLogout() {
+  auth.signOut();
+}
+
+auth.onAuthStateChanged((user) => {
+  if (user && user.email === ADMIN_EMAIL) {
+    document.getElementById("login-box").classList.add("hidden");
+    document.getElementById("admin-panel").classList.remove("hidden");
+    loadKeys();
+  } else {
+    document.getElementById("login-box").classList.remove("hidden");
+    document.getElementById("admin-panel").classList.add("hidden");
+    if (user) showMsg("login-msg", "এই ইমেইলের অ্যাডমিন অ্যাক্সেস নেই।", false);
+  }
+});
+
+function randomKey() {
+  const part = () => Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${part()}-${part()}-${part()}`;
+}
+
+async function createKey() {
+  let key = document.getElementById("new-key-input").value.trim().toUpperCase();
+  if (!key) key = randomKey();
+  try {
+    const ref = db.collection("licenses").doc(key);
+    const existing = await ref.get();
+    if (existing.exists) {
+      showMsg("create-msg", "এই কী আগে থেকেই আছে, অন্য নাম দিন।", false);
+      return;
+    }
+    await ref.set({
+      status: "unused",
+      deviceId: null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    showMsg("create-msg", `✅ নতুন কী তৈরি হয়েছে: ${key}`, true);
+    document.getElementById("new-key-input").value = "";
+    loadKeys();
+  } catch (e) {
+    showMsg("create-msg", "এরর: " + e.message, false);
+  }
+}
+
+async function loadKeys() {
+  const listBox = document.getElementById("keys-list");
+  listBox.innerHTML = "লোড হচ্ছে...";
+  try {
+    const snap = await db.collection("licenses").orderBy("createdAt", "desc").get();
+    if (snap.empty) {
+      listBox.innerHTML = "<p class='subtitle'>এখনো কোনো কী তৈরি হয়নি।</p>";
+      return;
+    }
+    let html = "<table class='t-table'><tr><th>কী</th><th>স্ট্যাটাস</th><th>একশন</th></tr>";
+    snap.forEach((doc) => {
+      const d = doc.data();
+      const statusColor = d.status === "active" ? "#22c55e" : d.status === "blocked" ? "#ef4444" : "#9aa4bf";
+      html += `<tr>
+        <td>${doc.id}</td>
+        <td style="color:${statusColor}">${d.status}</td>
+        <td>
+          ${d.status === "active" ? `<button class="btn-secondary" style="margin:2px 0;" onclick="resetKey('${doc.id}')">রিসেট</button>` : ""}
+          ${d.status !== "blocked" ? `<button class="btn-lose" style="margin:2px 0;" onclick="blockKey('${doc.id}')">ব্লক</button>` : `<button class="btn-win" style="margin:2px 0;" onclick="unblockKey('${doc.id}')">আনব্লক</button>`}
+        </td>
+      </tr>`;
+    });
+    html += "</table>";
+    listBox.innerHTML = html;
+  } catch (e) {
+    listBox.innerHTML = `<div class="error-msg">এরর: ${e.message}</div>`;
+  }
+}
+
+async function resetKey(key) {
+  if (!confirm(`"${key}" রিসেট করলে এই কী নতুন ডিভাইসে আবার ব্যবহার করা যাবে। নিশ্চিত?`)) return;
+  await db.collection("licenses").doc(key).update({ status: "unused", deviceId: null });
+  loadKeys();
+}
+async function blockKey(key) {
+  await db.collection("licenses").doc(key).update({ status: "blocked" });
+  loadKeys();
+}
+async function unblockKey(key) {
+  await db.collection("licenses").doc(key).update({ status: "unused", deviceId: null });
+  loadKeys();
+}
+</script>
+</body>
+</html>
