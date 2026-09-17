@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>License Key Lock System</title>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  
+  <!-- আপনার তৈরি করা Config File -->
+  <script src="firebase-config.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 90%;
+      max-width: 350px;
+    }
+    h2 { margin-bottom: 20px; color: #333; }
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 16px;
+      text-align: center;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #0056b3; }
+    #msg { margin-top: 15px; font-weight: bold; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+
+<div class="card" id="lock-screen">
+  <h2>সফটওয়্যার লাইসেন্স আনলক</h2>
+  <input type="text" id="license-input" placeholder="এখানে লাইসেন্স কী দিন">
+  <button onclick="verifyLicense()">আনলক করুন</button>
+  <p id="msg"></p>
+</div>
+
+<div class="card" id="app-screen" style="display: none;">
+  <h2 style="color: green;">স্বাগতম! 🎉</h2>
+  <p>আপনার লাইসেন্স কী সফলভাবে ভ্যালিডেট হয়েছে। অ্যাপটি এখন আনলকড!</p>
+</div>
+
+<script>
+  // ব্রাউজারের তৈরি করা একটি ইউনিক ডিভাইস আইডি
+  function getDeviceId() {
+    let deviceId = localStorage.getItem("device_id");
+    if (!deviceId) {
+      deviceId = "DEV-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+      localStorage.setItem("device_id", deviceId);
+    }
+    return deviceId;
+  }
+
+  // অটো-লগইন চেক (যদি আগে থেকেই এই ডিভাইসে ভ্যালিড করা থাকে)
+  window.onload = function() {
+    const savedKey = localStorage.getItem("active_license");
+    if (savedKey) {
+      document.getElementById("lock-screen").style.display = "none";
+      document.getElementById("app-screen").style.display = "block";
+    }
+  };
+
+  // লাইসেন্স ভ্যালিডেশন লজিক
+  async function verifyLicense() {
+    const key = document.getElementById("license-input").value.trim();
+    const msg = document.getElementById("msg");
+    const currentDeviceId = getDeviceId();
+
+    if (!key) {
+      msg.className = "error";
+      msg.innerText = "অনুগ্রহ করে লাইসেন্স কী টাইপ করুন!";
+      return;
+    }
+
+    msg.className = "";
+    msg.innerText = "যাচাই করা হচ্ছে...";
+
+    try {
+      const docRef = db.collection("licenses").doc(key);
+      const doc = await docRef.get();
+
+      if (!doc.exists) {
+        msg.className = "error";
+        msg.innerText = "ভুল লাইসেন্স কী!";
+        return;
+      }
+
+      const data = doc.data();
+
+      // কেস ১: লাইসেন্স একদম নতুন (Unused)
+      if (data.status === "unused") {
+        await docRef.update({
+          status: "used",
+          device_id: currentDeviceId
+        });
+        localStorage.setItem("active_license", key);
+        msg.className = "success";
+        msg.innerText = "লাইসেন্স সফলভাবে অ্যাক্টিভ হয়েছে!";
+        setTimeout(() => {
+          document.getElementById("lock-screen").style.display = "none";
+          document.getElementById("app-screen").style.display = "block";
+        }, 1000);
+      } 
+      // কেস ২: লাইসেন্সটি আগেই এই ডিভাইসে ব্যবহার করা হয়েছে
+      else if (data.status === "used" && data.device_id === currentDeviceId) {
+        localStorage.setItem("active_license", key);
+        document.getElementById("lock-screen").style.display = "none";
+        document.getElementById("app-screen").style.display = "block";
+      } 
+      // কেস ৩: লাইসেন্সটি অন্য কোনো ডিভাইসে অ্যাক্টিভ করা আছে
+      else {
+        msg.className = "error";
+        msg.innerText = "এই লাইসেন্স কী-টি অন্য ডিভাইসে ব্যবহৃত হচ্ছে!";
+      }
+
+    } catch (err) {
+      console.error(err);
+      msg.className = "error";
+      msg.innerText = "ত্রুটি ঘটেছে! ইন্টারনেট চেক করুন বা সিকিউরিটি রুলস যাচাই করুন।";
+    }
+  }
+</script>
+
+</body>
+</html>
