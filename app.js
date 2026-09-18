@@ -1,260 +1,204 @@
 // ==========================================================
-// ক্যালকুলেটর লজিক — Masaniello এবং Triple/Double Chance
-// স্টেক ফর্মুলা এখন ক্লায়েন্টে নেই, Netlify Function থেকে হিসাব হয়ে আসে
+// এই ফাইলে কোনো ফর্মুলা নেই। শুধু সেশন স্টেট রাখা হয় (কয়টা
+// ইভেন্ট হয়েছে, কয়টা জিতেছে) আর প্রতি ইভেন্টে সার্ভারকে
+// জিজ্ঞেস করে পরবর্তী স্টেক আনা হয়।
+// একই ইঞ্জিন তিনটা মোডেই ব্যবহার হয় — legs: 1/2/3
 // ==========================================================
 
-const CALC_ENDPOINT = "/.netlify/functions/calculate-stake";
-
-// ---------------- ট্যাব সুইচিং ----------------
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      const tab = btn.dataset.tab;
-      document.getElementById("masaniello-tab").classList.toggle("hidden", tab !== "masaniello");
-      document.getElementById("triple-tab").classList.toggle("hidden", tab !== "triple");
-    });
+async function callCalcApi(payload) {
+  const res = await fetch("/api/calculate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
   });
-
-  const savedKey = localStorage.getItem("active_license");
-  if (savedKey) {
-    document.getElementById("lock-screen").classList.add("hidden");
-    document.getElementById("app-screen").classList.remove("hidden");
-  }
-});
-
-// ---------------- ইউনিক ডিভাইস আইডি ----------------
-function getDeviceId() {
-  let deviceId = localStorage.getItem("device_id");
-  if (!deviceId) {
-    deviceId = "DEV-" + Math.random().toString(36).substring(2, 9).toUpperCase();
-    localStorage.setItem("device_id", deviceId);
-  }
-  return deviceId;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "সার্ভার এরর হয়েছে");
+  return data;
 }
 
-// ---------------- লাইসেন্স ভ্যালিডেশন (transaction-safe) ----------------
-async function verifyLicense() {
-  const key = document.getElementById("license-input").value.trim();
-  const msg = document.getElementById("license-msg");
-  const currentDeviceId = getDeviceId();
+// প্রতিটা মোডের জন্য আলাদা সেশন স্টেট
+const sessions = {
+  classic: null,
+  double: null,
+  triple: null
+};
+const legsByMode = { classic: 1, double: 2, triple: 3 };
+const labelByMode = {
+  classic: "Classic Masaniello",
+  double: "Double Chance Masaniello",
+  triple: "Triple Chance Masaniello"
+};
 
-  if (!key) {
-    msg.className = "error-msg";
-    msg.innerText = "অনুগ্রহ করে লাইসেন্স কী টাইপ করুন!";
-    return;
+function el(mode, name) {
+  return document.getElementById(`${mode}-${name}`);
+}
+
+// ইনপুট বক্স থেকে সেটিংস পড়ে + যাচাই করে; সমস্যা থাকলে null রিটার্ন করে
+function readSettings(mode) {
+  const capital = parseFloat(el(mode, "capital").value);
+  const totalEvents = parseInt(el(mode, "events").value, 10);
+  const requiredWins = parseInt(el(mode, "wins").value, 10);
+  const payout = parseFloat(el(mode, "payout").value);
+  const targetPct = parseFloat(el(mode, "target").value) / 100;
+
+  if (!capital || capital <= 0) { alert("সঠিক ক্যাপিটাল দিন।"); return null; }
+  if (!totalEvents || totalEvents < 1) { alert("মোট ইভেন্ট সংখ্যা দিন।"); return null; }
+  if (!requiredWins || requiredWins < 1 || requiredWins > totalEvents) {
+    alert("জয়ের সংখ্যা মোট ইভেন্টের সমান বা কম হতে হবে।"); return null;
   }
+  if (!payout || payout <= 1) { alert("সঠিক পে-আউট দিন (১ এর বেশি)।"); return null; }
+  if (isNaN(targetPct) || targetPct <= 0) { alert("সঠিক টার্গেট প্রফিট % দিন।"); return null; }
 
-  msg.className = "";
-  msg.innerText = "যাচাই করা হচ্ছে...";
+  return { capital, totalEvents, requiredWins, payout, targetPct };
+}
 
-  const docRef = db.collection("licenses").doc(key);
+// সেশন শুরুর আগে প্রিভিউ (Calculated Targets + Auto Stake) দেখায়
+async function previewCalc(mode) {
+  const settings = readSettings(mode);
+  if (!settings) return;
+
+  const previewBox = el(mode, "preview");
+  el(mode, "calc-warning").innerHTML = "";
+  previewBox.classList.remove("hidden");
+  el(mode, "calc-multiplier").textContent = "হিসাব হচ্ছে...";
 
   try {
-    // runTransaction ব্যবহার করা হয়েছে যাতে দুইজন একই মুহূর্তে একই কী দিয়ে
-    // চেষ্টা করলেও race condition না হয় (get + update আলাদাভাবে করলে যে ঝুঁকি ছিল)
-    await db.runTransaction(async (t) => {
-      const doc = await t.get(docRef);
-      if (!doc.exists) throw new Error("NOT_FOUND");
-
-      const data = doc.data();
-      if (data.status === "unused") {
-        t.update(docRef, { status: "used", device_id: currentDeviceId });
-      } else if (data.status === "used" && data.device_id === currentDeviceId) {
-        // এই ডিভাইসেই আগে অ্যাক্টিভ হয়েছিল, সমস্যা নেই
-      } else {
-        throw new Error("DEVICE_MISMATCH");
-      }
+    const result = await callCalcApi({
+      mode: "masaniello",
+      capital: settings.capital,
+      totalEvents: settings.totalEvents,
+      requiredWins: settings.requiredWins,
+      payout: settings.payout,
+      targetProfitPct: settings.targetPct,
+      initialCapital: settings.capital,
+      eventsCompleted: 0,
+      winsSoFar: 0,
+      legs: legsByMode[mode]
     });
 
-    localStorage.setItem("active_license", key);
-    msg.className = "success-msg";
-    msg.innerText = "লাইসেন্স সফলভাবে অ্যাক্টিভ হয়েছে!";
-    setTimeout(() => {
-      document.getElementById("lock-screen").classList.add("hidden");
-      document.getElementById("app-screen").classList.remove("hidden");
-    }, 800);
+    el(mode, "calc-multiplier").textContent = result.netMultiplier.toFixed(4);
+    el(mode, "calc-target").textContent = "৳" + result.targetCapital.toFixed(2);
 
-  } catch (err) {
-    msg.className = "error-msg";
-    if (err.message === "NOT_FOUND") {
-      msg.innerText = "ভুল লাইসেন্স কী!";
-    } else if (err.message === "DEVICE_MISMATCH") {
-      msg.innerText = "এই লাইসেন্স কী-টি অন্য ডিভাইসে ব্যবহৃত হচ্ছে!";
-    } else {
-      console.error(err);
-      msg.innerText = "ত্রুটি ঘটেছে! ইন্টারনেট চেক করুন বা সিকিউরিটি রুলস যাচাই করুন।";
+    const feasBox = el(mode, "calc-feasibility");
+    feasBox.textContent = result.feasible ? "FEASIBLE ✓" : "NOT FEASIBLE ✗";
+    feasBox.className = result.feasible ? "feasible-yes" : "feasible-no";
+
+    el(mode, "calc-stake").textContent = "৳" + result.stake.toFixed(2);
+
+    if (!result.feasible) {
+      el(mode, "calc-warning").innerHTML =
+        `<div class="warn-box">⚠️ এই সেটিংসে টার্গেট গ্যারান্টি করা সম্ভব না। Total Events / Wins / Payout বাড়ান অথবা Target % কমান।</div>`;
     }
+  } catch (e) {
+    el(mode, "calc-multiplier").textContent = "-";
+    el(mode, "calc-warning").innerHTML = `<div class="warn-box">এরর: ${e.message}</div>`;
   }
 }
 
-// ---------------- Masaniello State ----------------
-let mState = null; // { capital, target, betsLeft, winsLeft, initialCapital }
+async function startSession(mode) {
+  const settings = readSettings(mode);
+  if (!settings) return;
+  const { capital, totalEvents, requiredWins, payout, targetPct } = settings;
 
-function masanielloStart() {
-  const capital = parseFloat(document.getElementById("m-capital").value);
-  const multiplier = parseFloat(document.getElementById("m-multiplier").value);
-  const totalBets = parseInt(document.getElementById("m-bets").value, 10);
-  const winsNeeded = parseInt(document.getElementById("m-wins").value, 10);
-
-  if (!capital || capital <= 0) return alert("সঠিক ক্যাপিটাল দিন।");
-  if (!multiplier || multiplier <= 1) return alert("টার্গেট মাল্টিপ্লায়ার ১ এর বেশি হতে হবে (যেমন ২)।");
-  if (!totalBets || totalBets < 1) return alert("মোট বেট সংখ্যা দিন।");
-  if (!winsNeeded || winsNeeded < 1 || winsNeeded > totalBets)
-    return alert("জয়ের সংখ্যা মোট বেটের সমান বা কম হতে হবে।");
-
-  mState = {
+  sessions[mode] = {
     initialCapital: capital,
-    capital: capital,
-    target: capital * multiplier,
-    betsLeft: totalBets,
-    winsLeft: winsNeeded
+    capital,
+    totalEvents,
+    requiredWins,
+    payout,
+    targetPct,
+    eventsCompleted: 0,
+    winsSoFar: 0
   };
 
-  document.getElementById("m-setup").classList.add("hidden");
-  document.getElementById("m-play").classList.remove("hidden");
-  renderMasanielloStatus();
+  el(mode, "setup").classList.add("hidden");
+  el(mode, "play").classList.remove("hidden");
+  await refreshStake(mode);
 }
 
-function renderMasanielloStatus() {
-  document.getElementById("m-status").innerHTML = `
-    বর্তমান ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b> |
-    টার্গেট: <b>${mState.target.toFixed(2)}</b> |
-    বাকি বেট: <b>${mState.betsLeft}</b> |
-    বাকি জয় দরকার: <b>${mState.winsLeft}</b>
-  `;
-  document.getElementById("m-stake-result").innerHTML = "";
-}
-
-async function masanielloCalcStake() {
-  const odds = parseFloat(document.getElementById("m-odds").value);
-  if (!odds || odds <= 1) return alert("সঠিক অডস দিন (১ এর বেশি)।");
-  if (!mState || mState.winsLeft <= 0 || mState.betsLeft <= 0) return;
-
-  const resultElem = document.getElementById("m-stake-result");
-  resultElem.innerHTML = "হিসাব করা হচ্ছে...";
+async function refreshStake(mode) {
+  const s = sessions[mode];
+  const statusBox = el(mode, "status");
+  statusBox.innerHTML = "হিসাব করা হচ্ছে...";
 
   try {
-    const res = await fetch(CALC_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: "classic",
-        capital: mState.capital,
-        targetCapital: mState.target,
-        winsLeft: mState.winsLeft,
-        odds
-      })
+    const result = await callCalcApi({
+      mode: "masaniello",
+      capital: s.capital,
+      totalEvents: s.totalEvents,
+      requiredWins: s.requiredWins,
+      payout: s.payout,
+      targetProfitPct: s.targetPct,
+      initialCapital: s.initialCapital,
+      eventsCompleted: s.eventsCompleted,
+      winsSoFar: s.winsSoFar,
+      legs: legsByMode[mode]
     });
-    if (!res.ok) throw new Error("server error");
-    const data = await res.json();
 
-    mState._pendingStake = data.stake;
-    mState._pendingOdds = odds;
+    s._pendingStake = result.stake;
 
-    resultElem.innerHTML = `
-      এই বেটে দিতে হবে: <b>${data.stake.toFixed(2)}</b> (অডস ${odds})<br>
-      জিতলে ক্যাপিটাল হবে প্রায়: <b>${(mState.capital - data.stake + data.stake * odds).toFixed(2)}</b>
+    if (!result.feasible) {
+      statusBox.innerHTML = `⚠️ এই সেটিংসে টার্গেট গ্যারান্টি করা সম্ভব না (Total Events / Wins / Payout বাড়ান বা Target % কমান)।`;
+    }
+
+    if (result.status === "TARGET_ACHIEVED") {
+      statusBox.innerHTML += `<br>🎉 টার্গেট অর্জিত হয়ে গেছে! আর স্টেক দরকার নেই। বর্তমান ক্যাপিটাল: <b>৳${s.capital.toFixed(2)}</b>`;
+      el(mode, "event-controls").classList.add("hidden");
+      return;
+    }
+    if (result.status === "UNREACHABLE") {
+      statusBox.innerHTML += `<br>❌ বাকি ইভেন্টে টার্গেট পূরণ আর সম্ভব না। বর্তমান ক্যাপিটাল: <b>৳${s.capital.toFixed(2)}</b>`;
+      el(mode, "event-controls").classList.add("hidden");
+      return;
+    }
+
+    el(mode, "event-controls").classList.remove("hidden");
+    statusBox.innerHTML = `
+      ইভেন্ট: <b>${s.eventsCompleted + 1} / ${s.totalEvents}</b> |
+      বাকি জয় দরকার: <b>${result.winsStillNeeded}</b> |
+      বর্তমান ক্যাপিটাল: <b>৳${s.capital.toFixed(2)}</b><br>
+      টার্গেট ক্যাপিটাল: <b>৳${result.targetCapital.toFixed(2)}</b><br>
+      <span style="font-size:1.1rem;">এই ইভেন্টে স্টেক দিন: <b>৳${result.stake.toFixed(2)}</b></span>
     `;
-  } catch (err) {
-    console.error(err);
-    resultElem.innerHTML = "স্টেক হিসাব করা যায়নি। ইন্টারনেট/সার্ভার চেক করুন।";
+  } catch (e) {
+    statusBox.innerHTML = `<span style="color:#ef4444">এরর: ${e.message}</span>`;
   }
 }
 
-function masanielloResult(won) {
-  if (!mState || mState._pendingStake === undefined) return alert("আগে স্টেক ক্যালকুলেট করুন।");
-
-  const stake = mState._pendingStake;
-  const odds = mState._pendingOdds;
+async function recordResult(mode, won) {
+  const s = sessions[mode];
+  const stake = s._pendingStake || 0;
 
   if (won) {
-    mState.capital = mState.capital - stake + stake * odds;
-    mState.winsLeft -= 1;
+    const m = Math.pow(s.payout, legsByMode[mode]) - 1;
+    s.capital = s.capital - stake + stake * (1 + m);
+    s.winsSoFar += 1;
   } else {
-    mState.capital = mState.capital - stake;
+    s.capital = s.capital - stake;
   }
-  mState.betsLeft -= 1;
-  delete mState._pendingStake;
-  delete mState._pendingOdds;
-  document.getElementById("m-odds").value = "";
+  s.eventsCompleted += 1;
 
-  if (mState.winsLeft <= 0) {
-    document.getElementById("m-status").innerHTML = `🎉 টার্গেট সম্পন্ন! ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
-    document.getElementById("m-stake-result").innerHTML = "";
+  if (s.eventsCompleted >= s.totalEvents || s.capital <= 0) {
+    el(mode, "status").innerHTML = `সেশন শেষ। ফাইনাল ক্যাপিটাল: <b>৳${s.capital.toFixed(2)}</b>`;
+    el(mode, "event-controls").classList.add("hidden");
     return;
   }
-  if (mState.betsLeft <= 0) {
-    document.getElementById("m-status").innerHTML = `❌ বেট শেষ, টার্গেট পূরণ হয়নি। ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
-    document.getElementById("m-stake-result").innerHTML = "";
-    return;
-  }
-  renderMasanielloStatus();
+  await refreshStake(mode);
 }
 
-function masanielloReset() {
-  mState = null;
-  document.getElementById("m-setup").classList.remove("hidden");
-  document.getElementById("m-play").classList.add("hidden");
+function resetSession(mode) {
+  sessions[mode] = null;
+  el(mode, "setup").classList.remove("hidden");
+  el(mode, "preview").classList.add("hidden");
+  el(mode, "calc-warning").innerHTML = "";
+  el(mode, "play").classList.add("hidden");
+  el(mode, "event-controls").classList.remove("hidden");
 }
 
-// ---------------- Triple / Double Chance ----------------
-async function tripleChanceCalc() {
-  const capital = parseFloat(document.getElementById("t-capital").value);
-  const multiplier = parseFloat(document.getElementById("t-multiplier").value);
-  const o1 = parseFloat(document.getElementById("t-odds1").value);
-  const o2 = parseFloat(document.getElementById("t-odds2").value);
-  const o3raw = document.getElementById("t-odds3").value;
-  const o3 = o3raw ? parseFloat(o3raw) : null;
-
-  if (!capital || capital <= 0) return alert("সঠিক ক্যাপিটাল দিন।");
-  if (!multiplier || multiplier <= 1) return alert("টার্গেট মাল্টিপ্লায়ার ১ এর বেশি হতে হবে।");
-  if (!o1 || o1 <= 1 || !o2 || o2 <= 1) return alert("কমপক্ষে দুটি সঠিক অডস দিন।");
-
-  const odds = [o1, o2];
-  if (o3 && o3 > 1) odds.push(o3);
-
-  const resultElem = document.getElementById("t-result");
-  resultElem.innerHTML = "হিসাব করা হচ্ছে...";
-
-  try {
-    const res = await fetch(CALC_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode: "multi",
-        capital,
-        targetCapital: capital * multiplier,
-        odds
-      })
-    });
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      if (errData.error === "NO_EDGE") {
-        resultElem.innerHTML = `⚠️ এই অডস কম্বিনেশনে লাভের সুযোগ নেই। অন্তত একটা অডস বাড়িয়ে আবার চেষ্টা করুন।`;
-        return;
-      }
-      throw new Error(errData.error || "server error");
-    }
-    const data = await res.json();
-
-    let rows = "";
-    odds.forEach((q, i) => {
-      rows += `<tr><td>সিলেকশন ${i + 1} (অডস ${q})</td><td>${data.stakes[i].toFixed(2)}</td><td>${data.resultIfWin[i].toFixed(2)}</td></tr>`;
-    });
-
-    resultElem.innerHTML = `
-      মোট স্টেক: <b>${data.totalStake.toFixed(2)}</b> (ক্যাপিটালের ${((data.totalStake / capital) * 100).toFixed(1)}%)<br>
-      <table class="t-table">
-        <tr><th>সিলেকশন</th><th>স্টেক</th><th>জিতলে ফলাফল</th></tr>
-        ${rows}
-      </table>
-      <p class="t-note">যেকোনো একটি সিলেকশন জিতলে ক্যাপিটাল প্রায় সমানভাবে বাড়বে। সবগুলো হারলে ক্যাপিটাল কমবে মোট স্টেক পরিমাণ।</p>
-    `;
-  } catch (err) {
-    console.error(err);
-    resultElem.innerHTML = "স্টেক হিসাব করা যায়নি। ইন্টারনেট/সার্ভার চেক করুন।";
-  }
+// ---------------- ট্যাব সুইচিং ----------------
+function switchMode(mode) {
+  ["classic", "double", "triple"].forEach((m) => {
+    document.getElementById(`panel-${m}`).classList.toggle("hidden", m !== mode);
+    document.getElementById(`tab-${m}`).classList.toggle("active", m === mode);
+  });
 }

@@ -6,6 +6,9 @@
   --danger: #ef4444;
   --text: #eef1f8;
   --muted: #9aa4bf;
+  --navy: #0b1f3a;
+  --amber: #ffdd99;
+  --amber-dark: #f2b134;
   font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -70,3 +73,34 @@ button {
 .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 8px; }
 .success-msg { color: var(--accent2); font-size: 0.85rem; margin-top: 8px; }
 footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 20px; }
+
+/* ================= Dashboard: Settings / Calculated Targets / Auto Stake ================= */
+.dash-block { border-radius: 10px; overflow: hidden; margin-top: 14px; border: 1px solid #2c3352; }
+.dash-header {
+  background: var(--navy); color: #fff; font-weight: 700;
+  font-size: 0.8rem; padding: 8px 12px; letter-spacing: 0.3px;
+}
+.dash-table { width: 100%; border-collapse: collapse; background: #12172c; }
+.dash-table td { padding: 8px 10px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: middle; }
+.dash-table td:first-child { color: var(--muted); width: 55%; }
+.dash-table input.amber-cell {
+  width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--amber-dark);
+  background: var(--amber); color: #3a2a00; font-weight: 700; font-size: 0.85rem;
+  margin: 0;
+}
+.calc-table td:last-child { font-weight: 700; color: var(--text); text-align: right; }
+.feasible-yes { color: var(--accent2) !important; }
+.feasible-no { color: var(--danger) !important; }
+.auto-stake-box {
+  background: #123c22; color: #7dffb3; text-align: center; font-size: 1.35rem;
+  font-weight: 800; padding: 14px; margin: 0;
+}
+.auto-stake-label {
+  text-align: center; color: var(--muted); font-size: 0.75rem;
+  padding: 6px 0 0; background: #12172c;
+}
+.btn-preview { background: var(--amber-dark); color: #241900; margin-top: 14px; }
+.warn-box {
+  background: #3a2a00; color: #ffcf5c; font-size: 0.8rem;
+  padding: 10px 12px; border-radius: 8px; margin-top: 10px;
+}

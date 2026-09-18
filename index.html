@@ -1,105 +1,150 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Masaniello Money Management</title>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
-  <link rel="stylesheet" href="style.css">
-  <script src="firebase-config.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Masaniello Money Management</title>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <div class="wrap">
 
-  <!-- লক স্ক্রিন -->
+  <!-- ================= LOCK SCREEN ================= -->
   <div id="lock-screen" class="lock-screen">
-    <h1>🔒 লাইসেন্স আনলক</h1>
-    <p class="subtitle">সফটওয়্যার ব্যবহার করতে আপনার লাইসেন্স কী দিন</p>
-    <div class="card">
-      <label for="license-input">লাইসেন্স কী</label>
-      <input type="text" id="license-input" placeholder="XXXX-XXXX-XXXX">
-      <button type="button" class="btn-primary" onclick="verifyLicense()">আনলক করুন</button>
-      <div id="license-msg"></div>
-    </div>
+    <h1>🔒 লাইসেন্স যাচাই হচ্ছে...</h1>
+    <p class="subtitle">অনুগ্রহ করে অপেক্ষা করুন</p>
   </div>
 
-  <!-- মূল অ্যাপ -->
-  <div id="app-screen" class="hidden">
-    <h1>Masaniello Money Management</h1>
-    <p class="subtitle">আপনার ট্রেডিং এর ঝুঁকি নিয়ন্ত্রণ করুন দক্ষতার সাথে</p>
+  <div id="key-entry" class="card hidden">
+    <h1>🔑 লাইসেন্স কী দিন</h1>
+    <p class="subtitle">এই অ্যাপটি ব্যবহার করতে আপনার লাইসেন্স কী প্রয়োজন</p>
+    <label>লাইসেন্স কী</label>
+    <input type="text" id="key-input" placeholder="যেমনঃ ABCD-1234-EFGH" />
+    <button class="btn-primary" onclick="handleActivate()">অ্যাক্টিভেট করুন</button>
+    <div id="key-msg"></div>
+  </div>
+
+  <!-- ================= MAIN APP ================= -->
+  <div id="main-app" class="hidden">
+    <h1>📊 Masaniello Money Management</h1>
+    <p class="subtitle">আপনার পছন্দের সিস্টেম বেছে নিন</p>
 
     <div class="tabs">
-      <div class="tab-btn active" data-tab="masaniello">Masaniello</div>
-      <div class="tab-btn" data-tab="triple">Triple Chance</div>
+      <div class="tab-btn active" id="tab-classic" onclick="switchMode('classic')">Classic</div>
+      <div class="tab-btn" id="tab-double" onclick="switchMode('double')">Double Chance</div>
+      <div class="tab-btn" id="tab-triple" onclick="switchMode('triple')">Triple Chance</div>
     </div>
 
-    <!-- ===== Masaniello ===== -->
-    <div id="masaniello-tab">
-      <div class="card" id="m-setup">
-        <label for="m-capital">ক্যাপিটাল</label>
-        <input type="number" id="m-capital" value="1000">
+    <div id="panels-container"></div>
 
-        <label for="m-multiplier">টার্গেট মাল্টিপ্লায়ার (যেমন ২ মানে ক্যাপিটাল দ্বিগুণ)</label>
-        <input type="number" id="m-multiplier" step="0.01" value="2">
-
-        <label for="m-bets">মোট বেট সংখ্যা</label>
-        <input type="number" id="m-bets" value="10">
-
-        <label for="m-wins">জয়ের সংখ্যা দরকার</label>
-        <input type="number" id="m-wins" value="6">
-
-        <button type="button" class="btn-primary" onclick="masanielloStart()">সেশন শুরু করুন</button>
-      </div>
-
-      <div class="card hidden" id="m-play">
-        <div id="m-status"></div>
-
-        <label for="m-odds">এই বেটের অডস</label>
-        <input type="number" id="m-odds" step="0.01">
-
-        <button type="button" class="btn-secondary" onclick="masanielloCalcStake()">স্টেক হিসাব করুন</button>
-        <div id="m-stake-result"></div>
-
-        <div class="row-2">
-          <button type="button" class="btn-win" onclick="masanielloResult(true)">✅ জিতেছি</button>
-          <button type="button" class="btn-lose" onclick="masanielloResult(false)">❌ হেরেছি</button>
-        </div>
-        <button type="button" class="btn-secondary" onclick="masanielloReset()">নতুন সেশন</button>
-      </div>
-    </div>
-
-    <!-- ===== Triple / Double Chance ===== -->
-    <div id="triple-tab" class="hidden">
-      <div class="card">
-        <label for="t-capital">ক্যাপিটাল</label>
-        <input type="number" id="t-capital" value="1000">
-
-        <label for="t-multiplier">টার্গেট মাল্টিপ্লায়ার</label>
-        <input type="number" id="t-multiplier" step="0.01" value="1.5">
-
-        <label for="t-odds1">অডস ১</label>
-        <input type="number" id="t-odds1" step="0.01" value="2.0">
-
-        <label for="t-odds2">অডস ২</label>
-        <input type="number" id="t-odds2" step="0.01" value="3.0">
-
-        <label for="t-odds3">অডস ৩ (ঐচ্ছিক — খালি রাখলে Double Chance হিসেবে কাজ করবে)</label>
-        <input type="number" id="t-odds3" step="0.01">
-
-        <button type="button" class="btn-primary" onclick="tripleChanceCalc()">হিসাব করুন</button>
-        <div id="t-result"></div>
-      </div>
-    </div>
-
-    <footer>আপনার ফর্মুলা নিরাপদে সার্ভারে হিসাব করা হয় — ব্রাউজারে প্রকাশ পায় না।</footer>
+    <button class="btn-secondary" onclick="logoutDevice()">এই ডিভাইস থেকে লগআউট</button>
+    <footer>Licensed software — unauthorized sharing is prohibited</footer>
   </div>
+
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+
+<script src="firebase-config.js"></script>
+<script src="license.js"></script>
 <script src="app.js"></script>
+
+<script>
+// প্রতিটা মোডের প্যানেল JS দিয়ে তৈরি — তিনটাই একই গঠন, শুধু নাম আলাদা
+function buildPanel(mode, title, note) {
+  return `
+    <div id="panel-${mode}" class="card ${mode === "classic" ? "" : "hidden"}">
+      <h2 style="font-size:1rem;margin-top:0;">${title}</h2>
+      ${note ? `<p class="t-note" style="margin-top:0;">${note}</p>` : ""}
+
+      <div id="${mode}-setup">
+        <div class="dash-block">
+          <div class="dash-header">⚙️ SETTINGS — শুধু হলুদ ঘরগুলো এডিট করুন</div>
+          <table class="dash-table">
+            <tr><td>Initial Capital</td><td><input class="amber-cell" type="number" id="${mode}-capital" placeholder="যেমনঃ 10000" /></td></tr>
+            <tr><td>Total Events (N)</td><td><input class="amber-cell" type="number" id="${mode}-events" placeholder="যেমনঃ 30" /></td></tr>
+            <tr><td>Required Wins (K)</td><td><input class="amber-cell" type="number" id="${mode}-wins" placeholder="যেমনঃ 5" /></td></tr>
+            <tr><td>Payout / Quota (per leg)</td><td><input class="amber-cell" type="number" step="0.01" id="${mode}-payout" placeholder="যেমনঃ 1.90" /></td></tr>
+            <tr><td>Target Profit % (of Initial Capital)</td><td><input class="amber-cell" type="number" step="0.1" id="${mode}-target" placeholder="যেমনঃ 1" /></td></tr>
+          </table>
+        </div>
+
+        <button class="btn-preview" onclick="previewCalc('${mode}')">📐 প্রিভিউ ক্যালকুলেট করুন</button>
+
+        <div id="${mode}-preview" class="hidden">
+          <div class="dash-block">
+            <div class="dash-header">📐 CALCULATED TARGETS</div>
+            <table class="dash-table calc-table">
+              <tr><td>Net Multiplier per Win</td><td id="${mode}-calc-multiplier">-</td></tr>
+              <tr><td>Target Final Capital</td><td id="${mode}-calc-target">-</td></tr>
+              <tr><td>Feasibility Check</td><td id="${mode}-calc-feasibility">-</td></tr>
+            </table>
+          </div>
+          <div class="dash-block">
+            <div class="dash-header">🎯 AUTO STAKE</div>
+            <div class="auto-stake-label">প্রথম ইভেন্টের স্টেক</div>
+            <div class="auto-stake-box" id="${mode}-calc-stake">-</div>
+          </div>
+          <div id="${mode}-calc-warning"></div>
+          <button class="btn-primary" onclick="startSession('${mode}')">▶️ সেশন / ট্র্যাকিং শুরু করুন</button>
+        </div>
+      </div>
+
+      <div id="${mode}-play" class="hidden">
+        <div id="${mode}-status"></div>
+        <div id="${mode}-event-controls" class="row-2">
+          <button class="btn-win" onclick="recordResult('${mode}', true)">✅ জিতেছি</button>
+          <button class="btn-lose" onclick="recordResult('${mode}', false)">❌ হেরেছি</button>
+        </div>
+        <button class="btn-secondary" onclick="resetSession('${mode}')">রিসেট / নতুন সেশন</button>
+      </div>
+    </div>
+  `;
+}
+
+document.getElementById("panels-container").innerHTML =
+  buildPanel("classic", "Classic Masaniello", "প্রতিটা ইভেন্টে একটা মাত্র সিলেকশন।") +
+  buildPanel("double", "Double Chance Masaniello", "W = দুইটা লেগ-ই জিতলে তবেই জয় ধরা হবে।") +
+  buildPanel("triple", "Triple Chance Masaniello", "W = তিনটা লেগ-ই জিতলে তবেই জয় ধরা হবে।");
+
+function showMainApp() {
+  document.getElementById("lock-screen").classList.add("hidden");
+  document.getElementById("key-entry").classList.add("hidden");
+  document.getElementById("main-app").classList.remove("hidden");
+}
+
+function showKeyEntry(message) {
+  document.getElementById("lock-screen").classList.add("hidden");
+  document.getElementById("key-entry").classList.remove("hidden");
+  if (message) {
+    document.getElementById("key-msg").innerHTML = `<div class="error-msg">${message}</div>`;
+  }
+}
+
+async function handleActivate() {
+  const input = document.getElementById("key-input").value;
+  const msgBox = document.getElementById("key-msg");
+  msgBox.innerHTML = `<div class="subtitle">যাচাই করা হচ্ছে...</div>`;
+  const res = await activateLicense(input);
+  if (res.ok) {
+    msgBox.innerHTML = `<div class="success-msg">✅ সফলভাবে অ্যাক্টিভেট হয়েছে!</div>`;
+    setTimeout(showMainApp, 600);
+  } else {
+    msgBox.innerHTML = `<div class="error-msg">${res.message}</div>`;
+  }
+}
+
+(async function init() {
+  const check = await checkExistingActivation();
+  if (check.active) {
+    showMainApp();
+  } else {
+    showKeyEntry();
+  }
+})();
+</script>
 </body>
 </html>
