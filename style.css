@@ -196,3 +196,28 @@ footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top
 }
 .end-banner.achieved { background: #d7f5df; color: #1b6e34; }
 .end-banner.failed { background: #fbd6d3; color: #a02622; }
+
+/* Strong result colors for quick visual recognition. */
+.event-table tr.row-win td,
+.theme-classic .event-table tr.row-win td,
+.theme-navy .event-table tr.row-win td {
+  background: #7bd88f !important;
+  color: #063b18 !important;
+  font-weight: 800;
+}
+
+.event-table tr.row-lose td,
+.theme-classic .event-table tr.row-lose td,
+.theme-navy .event-table tr.row-lose td {
+  background: #f28b87 !important;
+  color: #681010 !important;
+  font-weight: 800;
+}
+
+.btn-undo { background: #f59e0b; color: #3b2200; width: 100%; font-size: 0.84rem; }
+.win-loss-row { flex-wrap: wrap; }
+.win-loss-row .result-action { flex: 1 1 calc(50% - 5px); }
+.win-loss-row .btn-undo { flex: 1 1 100%; margin-top: 0; }
+.language-screen { text-align: center; margin-top: 28vh; }
+.language-screen button { margin-top: 10px; }
+.auto-target-note { font-size: 0.75rem; color: #555; padding-top: 2px; }

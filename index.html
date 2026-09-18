@@ -9,35 +9,38 @@
 <body>
 <div class="wrap">
 
-  <!-- ================= LOCK SCREEN ================= -->
-  <div id="lock-screen" class="lock-screen">
-    <h1>🔒 লাইসেন্স যাচাই হচ্ছে...</h1>
-    <p class="subtitle">অনুগ্রহ করে অপেক্ষা করুন</p>
+  <div id="language-screen" class="card language-screen">
+    <h1 data-i18n="languageTitle">ভাষা নির্বাচন করুন</h1>
+    <p class="subtitle" data-i18n="languageSubtitle">আপনার পছন্দের ভাষা বেছে নিন</p>
+    <button class="btn-primary" onclick="chooseLanguage('bn')">বাংলা</button>
+    <button class="btn-secondary" onclick="chooseLanguage('en')">English</button>
+  </div>
+
+  <div id="lock-screen" class="lock-screen hidden">
+    <h1 data-i18n="licenseChecking">লাইসেন্স যাচাই হচ্ছে...</h1>
+    <p class="subtitle" data-i18n="pleaseWait">অনুগ্রহ করে অপেক্ষা করুন</p>
   </div>
 
   <div id="key-entry" class="card hidden">
-    <h1>🔑 লাইসেন্স কী দিন</h1>
-    <p class="subtitle">এই অ্যাপটি ব্যবহার করতে আপনার লাইসেন্স কী প্রয়োজন</p>
-    <label>লাইসেন্স কী</label>
-    <input type="text" id="key-input" placeholder="যেমনঃ ABCD-1234-EFGH" />
-    <button class="btn-primary" onclick="handleActivate()">অ্যাক্টিভেট করুন</button>
+    <h1 data-i18n="licenseRequired">লাইসেন্স কী দিন</h1>
+    <p class="subtitle" data-i18n="licenseRequiredSubtitle">এই অ্যাপটি ব্যবহার করতে আপনার লাইসেন্স কী প্রয়োজন</p>
+    <label data-i18n="licenseKey">লাইসেন্স কী</label>
+    <input type="text" id="key-input" data-i18n-placeholder="keyPlaceholder" placeholder="যেমনঃ ABCD-1234-EFGH" />
+    <button class="btn-primary" onclick="handleActivate()" data-i18n="activate">অ্যাক্টিভেট করুন</button>
     <div id="key-msg"></div>
   </div>
 
-  <!-- ================= MAIN APP ================= -->
   <div id="main-app" class="hidden">
-
-    <!-- ---- Mode selection menu (shown right after unlock) ---- -->
     <div id="mode-menu">
-      <h1>📊 Masaniello Money Management</h1>
-      <p class="subtitle">আপনার পছন্দের মানি ম্যানেজমেন্ট সিস্টেম বেছে নিন</p>
+      <h1 data-i18n="menuTitle">Masaniello Money Management</h1>
+      <p class="subtitle" data-i18n="menuSubtitle">আপনার পছন্দের মানি ম্যানেজমেন্ট সিস্টেম বেছে নিন</p>
 
       <div class="menu-options">
         <div class="menu-card mc-classic" onclick="openDashboard('classic')">
           <div class="icon">🧮</div>
           <div class="mc-text">
-            <div class="mc-title">Classic Masaniello</div>
-            <div class="mc-desc">একটা সিলেকশন প্রতি ইভেন্টে — টার্গেট অটো-হিসাব</div>
+            <div class="mc-title" data-i18n="classicTitle">Classic Masaniello</div>
+            <div class="mc-desc" data-i18n="classicDesc">একটা সিলেকশন প্রতি ইভেন্টে — টার্গেট অটো-হিসাব</div>
           </div>
           <div class="mc-arrow">›</div>
         </div>
@@ -45,8 +48,8 @@
         <div class="menu-card mc-double" onclick="openDashboard('double')">
           <div class="icon">🎯</div>
           <div class="mc-text">
-            <div class="mc-title">Double Chance</div>
-            <div class="mc-desc">২টা লেগ-ই জিতলে তবেই জয়</div>
+            <div class="mc-title" data-i18n="doubleTitle">Double Chance</div>
+            <div class="mc-desc" data-i18n="doubleDesc">২টা লেগ-ই জিতলে তবেই জয়</div>
           </div>
           <div class="mc-arrow">›</div>
         </div>
@@ -54,43 +57,50 @@
         <div class="menu-card mc-triple" onclick="openDashboard('triple')">
           <div class="icon">🏆</div>
           <div class="mc-text">
-            <div class="mc-title">Triple Chance</div>
-            <div class="mc-desc">৩টা লেগ-ই জিতলে তবেই জয়</div>
+            <div class="mc-title" data-i18n="tripleTitle">Triple Chance</div>
+            <div class="mc-desc" data-i18n="tripleDesc">৩টা লেগ-ই জিতলে তবেই জয়</div>
           </div>
           <div class="mc-arrow">›</div>
         </div>
       </div>
 
-      <button class="btn-secondary" onclick="logoutDevice()">এই ডিভাইস থেকে লগআউট</button>
-      <footer>Licensed software — unauthorized sharing is prohibited</footer>
+      <button class="btn-secondary" onclick="logoutDevice()" data-i18n="logout">এই ডিভাইস থেকে লগআউট</button>
+      <footer data-i18n="licensed">Licensed software — unauthorized sharing is prohibited</footer>
     </div>
 
-    <!-- ---- Dashboards (one shell per mode, built by JS, hidden until opened) ---- -->
     <div id="dashboards-container"></div>
-
   </div>
 
 </div>
 
-<!-- Firebase SDK -->
+<script src="i18n.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
-
 <script src="firebase-config.js"></script>
 <script src="license.js"></script>
 <script src="app.js"></script>
 
 <script>
+function chooseLanguage(lang) {
+  setLanguage(lang);
+  document.getElementById("language-screen").classList.add("hidden");
+  startLicenseFlow();
+}
+
 function showMainApp() {
+  document.getElementById("language-screen").classList.add("hidden");
   document.getElementById("lock-screen").classList.add("hidden");
   document.getElementById("key-entry").classList.add("hidden");
   document.getElementById("main-app").classList.remove("hidden");
+  applyStaticLanguage();
 }
 
 function showKeyEntry(message) {
+  document.getElementById("language-screen").classList.add("hidden");
   document.getElementById("lock-screen").classList.add("hidden");
   document.getElementById("key-entry").classList.remove("hidden");
+  applyStaticLanguage();
   if (message) {
     document.getElementById("key-msg").innerHTML = `<div class="error-msg">${message}</div>`;
   }
@@ -99,24 +109,33 @@ function showKeyEntry(message) {
 async function handleActivate() {
   const input = document.getElementById("key-input").value;
   const msgBox = document.getElementById("key-msg");
-  msgBox.innerHTML = `<div class="subtitle">যাচাই করা হচ্ছে...</div>`;
+  msgBox.innerHTML = `<div class="subtitle">${t("checking")}</div>`;
   const res = await activateLicense(input);
   if (res.ok) {
-    msgBox.innerHTML = `<div class="success-msg">✅ সফলভাবে অ্যাক্টিভেট হয়েছে!</div>`;
-    setTimeout(showMainApp, 600);
+    msgBox.innerHTML = `<div class="success-msg">${t("activated")}</div>`;
+    setTimeout(showMainApp, 250);
   } else {
     msgBox.innerHTML = `<div class="error-msg">${res.message}</div>`;
   }
 }
 
-(async function init() {
+async function startLicenseFlow() {
+  document.getElementById("lock-screen").classList.remove("hidden");
+  applyStaticLanguage();
   const check = await checkExistingActivation();
-  if (check.active) {
-    showMainApp();
+  if (check.active) showMainApp();
+  else showKeyEntry();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const savedLanguage = localStorage.getItem("masaniello_language");
+  if (savedLanguage === "bn" || savedLanguage === "en") {
+    setLanguage(savedLanguage);
+    startLicenseFlow();
   } else {
-    showKeyEntry();
+    applyStaticLanguage();
   }
-})();
+});
 </script>
 </body>
 </html>
