@@ -1,19 +1,9 @@
 // ==========================================================
-// এই ফাইলে কোনো ফর্মুলা নেই — শুধু UI, সেশন স্টেট, আর সার্ভার
-// (/api/calculate) থেকে স্টেক আনার লজিক। আসল ম্যাথ সবসময়
-// netlify/functions/calculate.js এ থাকে, এখানে হাত দেওয়া হয়নি।
+// Masaniello UI and session logic
 //
-// প্রতিটা মোডের জন্য একটা Excel-স্টাইল ড্যাশবোর্ড তৈরি হয়:
-//  - Classic         → লাল/কমলা থিম (theme-classic)
-//  - Double / Triple  → নেভি ব্লু থিম (theme-navy), দুইটার ডিজাইন
-//                       সম্পূর্ণ একই
-//
-// প্রিভিউ টেবিল কীভাবে বানানো হয়:
-//   এখনো পর্যন্ত সম্পন্ন হওয়া ইভেন্টগুলার জন্য আসল ফলাফল দেখানো
-//   হয়। বাকি (এখনো না-খেলা) ইভেন্টগুলার স্টেক দেখানো হয় বর্তমান
-//   আসল ক্যাপিটাল ও winsSoFar স্থির রেখে শুধু ইভেন্ট-ইনডেক্স (m)
-//   পরিবর্তন করে সার্ভারের একই ফর্মুলা কল করে — এটাই এক্সেল শীটের
-//   "future rows" প্যাটার্নের সাথে যাচাই করে মিলিয়ে নেওয়া হয়েছে।
+// Performance version:
+// - One batch request refreshes the whole preview table.
+// - The calculation formula remains on the Netlify Function.
 // ==========================================================
 
 async function callCalcApi(payload) {
@@ -29,23 +19,27 @@ async function callCalcApi(payload) {
 
 const MODE_META = {
   classic: { theme: "theme-classic", title: "CLASSIC MASANIELLO — DASHBOARD", hasTarget: false },
-  double:  { theme: "theme-navy",    title: "DOUBLE CHANCE MASANIELLO — DASHBOARD", hasTarget: true },
-  triple:  { theme: "theme-navy",    title: "TRIPLE CHANCE MASANIELLO — DASHBOARD", hasTarget: true }
+  double: { theme: "theme-navy", title: "DOUBLE CHANCE MASANIELLO — DASHBOARD", hasTarget: true },
+  triple: { theme: "theme-navy", title: "TRIPLE CHANCE MASANIELLO — DASHBOARD", hasTarget: true }
 };
 const legsByMode = { double: 2, triple: 3 };
-
 const sessions = { classic: null, double: null, triple: null };
 
 function el(mode, name) {
   return document.getElementById(`${mode}-${name}`);
 }
 
+const numberFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
+
 function fmt(n) {
   if (n === null || n === undefined || isNaN(n)) return "-";
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return numberFormatter.format(n);
 }
 
-// ---------------- ড্যাশবোর্ড HTML তৈরি (একবারই, mode অনুযায়ী) ----------------
+// ---------------- Dashboard HTML ----------------
 function buildDashboard(mode) {
   const meta = MODE_META[mode];
   const targetRow = meta.hasTarget
@@ -70,7 +64,7 @@ function buildDashboard(mode) {
   const stakePanel = meta.hasTarget
     ? `
       <div class="panel p-stake hidden" id="${mode}-stake-panel">
-        <div class="panel-title pt-stake">🎯 AUTO STAKE</div>
+        <div class="panel-title pt-stake">AUTO STAKE</div>
         <table class="excel-table">
           <tr><td class="excel-row-label">Auto First Event Stake</td><td class="excel-row-value stat-box win" id="${mode}-r-firststake">-</td></tr>
           <tr><td class="excel-row-label">Next Event Stake</td><td class="excel-row-value stat-box win" id="${mode}-r-nextstake">-</td></tr>
@@ -78,7 +72,7 @@ function buildDashboard(mode) {
       </div>`
     : `
       <div class="panel p-stake hidden" id="${mode}-stake-panel">
-        <div class="panel-title pt-sequence">🔁 SEQUENZA</div>
+        <div class="panel-title pt-sequence">SEQUENZA</div>
         <table class="excel-table">
           <tr><td class="excel-row-label">Eventi Vinti</td><td class="excel-row-value stat-box win" id="${mode}-r-wins">0</td></tr>
           <tr><td class="excel-row-label">Eventi Persi</td><td class="excel-row-value stat-box lose" id="${mode}-r-losses">0</td></tr>
@@ -94,7 +88,7 @@ function buildDashboard(mode) {
     <div class="dash-title">${meta.title}</div>
 
     <div class="panel p-settings">
-      <div class="panel-title pt-settings">⚙ SETTINGS — শুধু হলুদ ঘরগুলো এডিট করুন</div>
+      <div class="panel-title pt-settings">SETTINGS — শুধু হলুদ ঘরগুলো এডিট করুন</div>
       <table class="excel-table">
         <tr>
           <td class="excel-row-label">Initial Capital</td>
@@ -120,7 +114,7 @@ function buildDashboard(mode) {
     </div>
 
     <div class="panel p-results hidden" id="${mode}-results-panel">
-      <div class="panel-title pt-results">⚠ CALCULATED TARGETS</div>
+      <div class="panel-title pt-results">CALCULATED TARGETS</div>
       <table class="excel-table">
         ${resultsRows}
       </table>
@@ -146,8 +140,8 @@ function buildDashboard(mode) {
     </div>
 
     <div class="win-loss-row hidden" id="${mode}-winloss-row">
-      <button class="btn-win" onclick="recordResult('${mode}', true)">✅ জিতেছি</button>
-      <button class="btn-lose" onclick="recordResult('${mode}', false)">❌ হেরেছি</button>
+      <button class="btn-win" onclick="recordResult('${mode}', true)">জিতেছি</button>
+      <button class="btn-lose" onclick="recordResult('${mode}', false)">হেরেছি</button>
     </div>
 
     <div class="dash-actions" style="padding-top:0;">
@@ -165,7 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// ---------------- মেনু <-> ড্যাশবোর্ড নেভিগেশন ----------------
+// ---------------- Menu navigation ----------------
 function openDashboard(mode) {
   document.getElementById("mode-menu").classList.add("hidden");
   document.getElementById(`dashboard-${mode}`).classList.remove("hidden");
@@ -176,7 +170,7 @@ function backToMenu(mode) {
   document.getElementById("mode-menu").classList.remove("hidden");
 }
 
-// ---------------- সেশন শুরু ----------------
+// ---------------- Start session ----------------
 async function startSession(mode) {
   const capital = parseFloat(el(mode, "capital").value);
   const totalEvents = parseInt(el(mode, "events").value, 10);
@@ -197,7 +191,8 @@ async function startSession(mode) {
     payout,
     eventsCompleted: 0,
     winsSoFar: 0,
-    rows: [] // { event, result, stake, netPL, capitalAfter, isPreview }
+    rows: [],
+    refreshing: false
   };
 
   if (MODE_META[mode].hasTarget) {
@@ -207,9 +202,9 @@ async function startSession(mode) {
   }
 
   sessions[mode] = session;
-
-  el(mode, "start-btn").disabled = true;
-  el(mode, "start-btn").textContent = "হিসাব করা হচ্ছে...";
+  const startButton = el(mode, "start-btn");
+  startButton.disabled = true;
+  startButton.textContent = "হিসাব করা হচ্ছে...";
 
   try {
     await refreshAll(mode);
@@ -219,26 +214,27 @@ async function startSession(mode) {
   } catch (e) {
     alert("এরর: " + e.message);
   } finally {
-    el(mode, "start-btn").disabled = false;
-    el(mode, "start-btn").textContent = "সেশন শুরু করুন / Calculate";
+    startButton.disabled = false;
+    startButton.textContent = "সেশন শুরু করুন / Calculate";
   }
 }
 
-// ---------------- একটা নির্দিষ্ট m (eventsCompleted) এর জন্য সার্ভার কল ----------------
-async function calcForIndex(mode, s, eventsCompletedIdx) {
+function makeCalcPayload(mode, s) {
   if (mode === "classic") {
-    return callCalcApi({
+    return {
       mode: "classic",
       capital: s.capital,
       initialCapital: s.initialCapital,
       totalEvents: s.totalEvents,
       requiredWins: s.requiredWins,
       payout: s.payout,
-      eventsCompleted: eventsCompletedIdx,
-      winsSoFar: s.winsSoFar
-    });
+      eventsCompleted: s.eventsCompleted,
+      winsSoFar: s.winsSoFar,
+      batch: true
+    };
   }
-  return callCalcApi({
+
+  return {
     mode: "masaniello",
     capital: s.capital,
     totalEvents: s.totalEvents,
@@ -246,67 +242,71 @@ async function calcForIndex(mode, s, eventsCompletedIdx) {
     payout: s.payout,
     targetProfitPct: s.targetPct,
     initialCapital: s.initialCapital,
-    eventsCompleted: eventsCompletedIdx,
+    eventsCompleted: s.eventsCompleted,
     winsSoFar: s.winsSoFar,
-    legs: legsByMode[mode]
-  });
+    legs: legsByMode[mode],
+    batch: true
+  };
 }
 
-// ---------------- টার্গেট প্যানেল + প্রিভিউ টেবিল রিফ্রেশ ----------------
+// ---------------- One batch refresh for the complete preview table ----------------
 async function refreshAll(mode) {
   const s = sessions[mode];
-  if (!s) return;
+  if (!s || s.refreshing) return;
+  s.refreshing = true;
 
-  // eventsCompleted পর্যন্ত rows[] এ যা আছে (আসল ফলাফল) রাখা হবে,
-  // তার পরের রো-গুলা নতুন করে প্রিভিউ হিসেবে বানানো হবে।
-  s.rows = s.rows.slice(0, s.eventsCompleted);
+  try {
+    const data = await callCalcApi(makeCalcPayload(mode, s));
+    const completedRows = s.rows.slice(0, s.eventsCompleted);
+    const previewRows = Array.isArray(data.rows) ? data.rows : [];
 
-  let firstResult = null;
-
-  for (let m = s.eventsCompleted; m < s.totalEvents; m++) {
-    const result = await calcForIndex(mode, s, m);
-    if (m === s.eventsCompleted) firstResult = result;
-    s.rows.push({
-      event: m + 1,
+    s.rows = completedRows.concat(previewRows.map((row) => ({
+      event: row.event,
       result: null,
-      stake: result.stake,
+      stake: row.stake,
       netPL: null,
       capitalAfter: s.capital,
       isPreview: true,
-      _apiStatus: result.status
-    });
-  }
+      _apiStatus: row.status
+    })));
 
-  if (firstResult) {
-    // ---- টার্গেট প্যানেল আপডেট ----
-    if (MODE_META[mode].hasTarget) {
-      el(mode, "r-mult").textContent = firstResult.netMultiplier.toFixed(4);
-      el(mode, "r-target").textContent = fmt(firstResult.targetCapital);
-      el(mode, "r-ratio").textContent = firstResult.requiredRatio.toFixed(6);
-      el(mode, "r-feasible").innerHTML = firstResult.feasible
-        ? `<span class="feasible-badge yes">FEASIBLE ✓</span>`
-        : `<span class="feasible-badge no">NOT FEASIBLE ✕</span>`;
-      el(mode, "r-firststake").textContent = fmt(s.rows[0] ? s.rows[0].stake : firstResult.stake);
-      el(mode, "r-nextstake").textContent = fmt(firstResult.stake);
-    } else {
-      el(mode, "r-target").textContent = fmt(firstResult.targetCapital);
-      el(mode, "r-mult").textContent = firstResult.resaPercent.toFixed(2) + "%";
-      el(mode, "r-wins").textContent = s.winsSoFar;
-      el(mode, "r-losses").textContent = s.eventsCompleted - s.winsSoFar;
-    }
+    updateSummary(mode, data);
+    renderTable(mode);
+    updateWinLossVisibility(mode, data);
+  } finally {
+    s.refreshing = false;
   }
-
-  renderTable(mode);
-  updateWinLossVisibility(mode, firstResult);
 }
 
-function updateWinLossVisibility(mode, firstResult) {
+function updateSummary(mode, result) {
+  if (MODE_META[mode].hasTarget) {
+    el(mode, "r-mult").textContent = Number(result.netMultiplier).toFixed(4);
+    el(mode, "r-target").textContent = fmt(result.targetCapital);
+    el(mode, "r-ratio").textContent = Number(result.requiredRatio).toFixed(6);
+    el(mode, "r-feasible").innerHTML = result.feasible
+      ? `<span class="feasible-badge yes">FEASIBLE ✓</span>`
+      : `<span class="feasible-badge no">NOT FEASIBLE ✕</span>`;
+
+    const s = sessions[mode];
+    const firstPreview = s && s.rows.find((row) => row.isPreview);
+    el(mode, "r-firststake").textContent = fmt(firstPreview ? firstPreview.stake : result.stake);
+    el(mode, "r-nextstake").textContent = fmt(result.stake);
+  } else {
+    el(mode, "r-target").textContent = fmt(result.targetCapital);
+    el(mode, "r-mult").textContent = Number(result.resaPercent).toFixed(2) + "%";
+    const s = sessions[mode];
+    el(mode, "r-wins").textContent = s.winsSoFar;
+    el(mode, "r-losses").textContent = s.eventsCompleted - s.winsSoFar;
+  }
+}
+
+function updateWinLossVisibility(mode, result) {
   const s = sessions[mode];
   const winLossRow = document.getElementById(`${mode}-winloss-row`);
   const banner = document.getElementById(`${mode}-end-banner`);
   banner.innerHTML = "";
 
-  const status = firstResult ? firstResult.status : null;
+  const status = result ? result.status : null;
 
   if (s.eventsCompleted >= s.totalEvents || s.capital <= 0) {
     winLossRow.classList.add("hidden");
@@ -315,26 +315,33 @@ function updateWinLossVisibility(mode, firstResult) {
   }
   if (status === "TARGET_ACHIEVED") {
     winLossRow.classList.add("hidden");
-    banner.innerHTML = `<div class="end-banner achieved">🎉 টার্গেট অর্জিত হয়ে গেছে! বর্তমান ক্যাপিটাল: ৳${fmt(s.capital)}</div>`;
+    banner.innerHTML = `<div class="end-banner achieved">টার্গেট অর্জিত হয়ে গেছে! বর্তমান ক্যাপিটাল: ৳${fmt(s.capital)}</div>`;
     return;
   }
   if (status === "UNREACHABLE") {
     winLossRow.classList.add("hidden");
-    banner.innerHTML = `<div class="end-banner failed">❌ বাকি ইভেন্টে টার্গেট পূরণ আর সম্ভব না। বর্তমান ক্যাপিটাল: ৳${fmt(s.capital)}</div>`;
+    banner.innerHTML = `<div class="end-banner failed">বাকি ইভেন্টে টার্গেট পূরণ আর সম্ভব না। বর্তমান ক্যাপিটাল: ৳${fmt(s.capital)}</div>`;
     return;
   }
   winLossRow.classList.remove("hidden");
 }
 
-// ---------------- টেবিল রেন্ডার ----------------
+// ---------------- Table rendering ----------------
 function renderTable(mode) {
   const s = sessions[mode];
   const tbody = el(mode, "tbody");
   const rowsHtml = s.rows.map((r, idx) => {
     const isCurrent = idx === s.eventsCompleted && !r.result;
-    const cls = r.result === "W" ? "row-win" : r.result === "L" ? "row-lose" : (isCurrent ? "row-current row-preview" : "row-preview");
+    const cls = r.result === "W"
+      ? "row-win"
+      : r.result === "L"
+        ? "row-lose"
+        : (isCurrent ? "row-current row-preview" : "row-preview");
     const resultTxt = r.result ? r.result : (isCurrent ? "…" : "");
-    const netPLTxt = r.netPL === null ? "-" : (r.netPL >= 0 ? "৳" + fmt(r.netPL) : "-৳" + fmt(Math.abs(r.netPL)));
+    const netPLTxt = r.netPL === null
+      ? "-"
+      : (r.netPL >= 0 ? "৳" + fmt(r.netPL) : "-৳" + fmt(Math.abs(r.netPL)));
+
     return `
       <tr class="${cls}">
         <td>${r.event}</td>
@@ -348,18 +355,22 @@ function renderTable(mode) {
   tbody.innerHTML = rowsHtml;
 }
 
-// ---------------- ফলাফল রেকর্ড (জিতেছি / হেরেছি) ----------------
+// ---------------- Record result ----------------
 async function recordResult(mode, won) {
   const s = sessions[mode];
-  if (!s) return;
+  if (!s || s.refreshing) return;
+
   const idx = s.eventsCompleted;
   const row = s.rows[idx];
   if (!row) return;
-  const stake = row.stake || 0;
 
+  const stake = row.stake || 0;
   let netPL;
+
   if (won) {
-    const effectivePayout = mode === "classic" ? s.payout : Math.pow(s.payout, legsByMode[mode]);
+    const effectivePayout = mode === "classic"
+      ? s.payout
+      : Math.pow(s.payout, legsByMode[mode]);
     netPL = stake * effectivePayout - stake;
     s.capital = s.capital - stake + stake * effectivePayout;
     s.winsSoFar += 1;
@@ -372,7 +383,6 @@ async function recordResult(mode, won) {
   row.netPL = netPL;
   row.capitalAfter = s.capital;
   row.isPreview = false;
-
   s.eventsCompleted += 1;
 
   if (s.eventsCompleted >= s.totalEvents || s.capital <= 0) {
