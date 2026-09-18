@@ -2,14 +2,26 @@
 // ক্যালকুলেটর লজিক — Masaniello এবং Triple Chance
 // ==========================================================
 
-// ---------------- Masaniello ----------------
+// ---------------- Masaniello State ----------------
 let mState = null; // { capital, target, betsLeft, winsLeft, initialCapital }
 
+/**
+ * Masaniello সেশন শুরু করার ফাংশন
+ */
 function masanielloStart() {
-  const capital = parseFloat(document.getElementById("m-capital").value);
-  const multiplier = parseFloat(document.getElementById("m-multiplier").value);
-  const totalBets = parseInt(document.getElementById("m-bets").value, 10);
-  const winsNeeded = parseInt(document.getElementById("m-wins").value, 10);
+  const capitalElem = document.getElementById("m-capital");
+  const multiplierElem = document.getElementById("m-multiplier");
+  const betsElem = document.getElementById("m-bets");
+  const winsElem = document.getElementById("m-wins");
+
+  if (!capitalElem || !multiplierElem || !betsElem || !winsElem) {
+    return alert("প্রয়োজনীয় ইনপুট ফিল্ড খুঁজে পাওয়া যায়নি!");
+  }
+
+  const capital = parseFloat(capitalElem.value);
+  const multiplier = parseFloat(multiplierElem.value);
+  const totalBets = parseInt(betsElem.value, 10);
+  const winsNeeded = parseInt(winsElem.value, 10);
 
   if (!capital || capital <= 0) return alert("সঠিক ক্যাপিটাল দিন।");
   if (!multiplier || multiplier <= 1) return alert("টার্গেট মাল্টিপ্লায়ার ১ এর বেশি হতে হবে (যেমন ২)।");
@@ -24,27 +36,46 @@ function masanielloStart() {
     betsLeft: totalBets,
     winsLeft: winsNeeded
   };
-  document.getElementById("m-setup").style.display = "none";
-  document.getElementById("m-play").style.display = "block";
+
+  const setupElem = document.getElementById("m-setup");
+  const playElem = document.getElementById("m-play");
+
+  if (setupElem) setupElem.style.display = "none";
+  if (playElem) playElem.style.display = "block";
+
   renderMasanielloStatus();
 }
 
+/**
+ * স্ট্যাটাস আপডেট রিঅ্যান্ডারিং
+ */
 function renderMasanielloStatus() {
-  document.getElementById("m-status").innerHTML = `
-    বর্তমান ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b> |
-    টার্গেট: <b>${mState.target.toFixed(2)}</b> |
-    বাকি বেট: <b>${mState.betsLeft}</b> |
-    বাকি জয় দরকার: <b>${mState.winsLeft}</b>
-  `;
-  document.getElementById("m-stake-result").innerHTML = "";
+  const statusElem = document.getElementById("m-status");
+  const resultElem = document.getElementById("m-stake-result");
+
+  if (statusElem) {
+    statusElem.innerHTML = `
+      বর্তমান ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b> |
+      টার্গেট: <b>${mState.target.toFixed(2)}</b> |
+      বাকি বেট: <b>${mState.betsLeft}</b> |
+      বাকি জয় দরকার: <b>${mState.winsLeft}</b>
+    `;
+  }
+  if (resultElem) resultElem.innerHTML = "";
 }
 
+/**
+ * স্টেক (Stake) হিসাব করার ফাংশন
+ */
 function masanielloCalcStake() {
-  const odds = parseFloat(document.getElementById("m-odds").value);
-  if (!odds || odds <= 1) return alert("সঠিক অডস দিন (১ এর বেশি)।");
-  if (mState.winsLeft <= 0 || mState.betsLeft <= 0) return;
+  const oddsElem = document.getElementById("m-odds");
+  if (!oddsElem) return;
 
-  // r = এই ধাপে ক্যাপিটাল যতগুণ বাড়াতে হবে (বাকি যতগুলো জয় দরকার তার উপর ভিত্তি করে)
+  const odds = parseFloat(oddsElem.value);
+  if (!odds || odds <= 1) return alert("সঠিক অডস দিন (১ এর বেশি)।");
+  if (!mState || mState.winsLeft <= 0 || mState.betsLeft <= 0) return;
+
+  // r = এই ধাপে ক্যাপিটাল যতগুণ বাড়াতে হবে
   const r = Math.pow(mState.target / mState.capital, 1 / mState.winsLeft);
   let stake = (mState.capital * (r - 1)) / (odds - 1);
 
@@ -55,14 +86,21 @@ function masanielloCalcStake() {
   mState._pendingStake = stake;
   mState._pendingOdds = odds;
 
-  document.getElementById("m-stake-result").innerHTML = `
-    এই বেটে দিতে হবে: <b>${stake.toFixed(2)}</b> (অডস ${odds})<br>
-    জিতলে ক্যাপিটাল হবে প্রায়: <b>${(mState.capital - stake + stake * odds).toFixed(2)}</b>
-  `;
+  const resultElem = document.getElementById("m-stake-result");
+  if (resultElem) {
+    resultElem.innerHTML = `
+      এই বেটে দিতে হবে: <b>${stake.toFixed(2)}</b> (অডস ${odds})<br>
+      জিতলে ক্যাপিটাল হবে প্রায়: <b>${(mState.capital - stake + stake * odds).toFixed(2)}</b>
+    `;
+  }
 }
 
+/**
+ * বেটের ফলাফল (Win / Loss) প্রসেস করার ফাংশন
+ */
 function masanielloResult(won) {
-  if (mState._pendingStake === undefined) return alert("আগে স্টেক ক্যালকুলেট করুন।");
+  if (!mState || mState._pendingStake === undefined) return alert("আগে স্টেক ক্যালকুলেট করুন।");
+
   const stake = mState._pendingStake;
   const odds = mState._pendingOdds;
 
@@ -72,39 +110,66 @@ function masanielloResult(won) {
   } else {
     mState.capital = mState.capital - stake;
   }
+
   mState.betsLeft -= 1;
   delete mState._pendingStake;
   delete mState._pendingOdds;
-  document.getElementById("m-odds").value = "";
+
+  const oddsElem = document.getElementById("m-odds");
+  if (oddsElem) oddsElem.value = "";
+
+  const statusElem = document.getElementById("m-status");
+  const resultElem = document.getElementById("m-stake-result");
 
   if (mState.winsLeft <= 0) {
-    document.getElementById("m-status").innerHTML =
-      `🎉 টার্গেট সম্পন্ন! ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
-    document.getElementById("m-stake-result").innerHTML = "";
+    if (statusElem) {
+      statusElem.innerHTML = `🎉 টার্গেট সম্পন্ন! ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
+    }
+    if (resultElem) resultElem.innerHTML = "";
     return;
   }
+
   if (mState.betsLeft <= 0) {
-    document.getElementById("m-status").innerHTML =
-      `❌ বেট শেষ, টার্গেট পূরণ হয়নি। ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
-    document.getElementById("m-stake-result").innerHTML = "";
+    if (statusElem) {
+      statusElem.innerHTML = `❌ বেট শেষ, টার্গেট পূরণ হয়নি। ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
+    }
+    if (resultElem) resultElem.innerHTML = "";
     return;
   }
+
   renderMasanielloStatus();
 }
 
+/**
+ * রিসেট করার ফাংশন
+ */
 function masanielloReset() {
   mState = null;
-  document.getElementById("m-setup").style.display = "block";
-  document.getElementById("m-play").style.display = "none";
+  const setupElem = document.getElementById("m-setup");
+  const playElem = document.getElementById("m-play");
+
+  if (setupElem) setupElem.style.display = "block";
+  if (playElem) playElem.style.display = "none";
 }
 
 // ---------------- Triple Chance ----------------
+/**
+ * Triple Chance হিসাবের ফাংশন
+ */
 function tripleChanceCalc() {
-  const capital = parseFloat(document.getElementById("t-capital").value);
-  const multiplier = parseFloat(document.getElementById("t-multiplier").value);
-  const o1 = parseFloat(document.getElementById("t-odds1").value);
-  const o2 = parseFloat(document.getElementById("t-odds2").value);
-  const o3raw = document.getElementById("t-odds3").value;
+  const capElem = document.getElementById("t-capital");
+  const multElem = document.getElementById("t-multiplier");
+  const o1Elem = document.getElementById("t-odds1");
+  const o2Elem = document.getElementById("t-odds2");
+  const o3Elem = document.getElementById("t-odds3");
+
+  if (!capElem || !multElem || !o1Elem || !o2Elem) return;
+
+  const capital = parseFloat(capElem.value);
+  const multiplier = parseFloat(multElem.value);
+  const o1 = parseFloat(o1Elem.value);
+  const o2 = parseFloat(o2Elem.value);
+  const o3raw = o3Elem ? o3Elem.value : null;
   const o3 = o3raw ? parseFloat(o3raw) : null;
 
   if (!capital || capital <= 0) return alert("সঠিক ক্যাপিটাল দিন।");
@@ -116,11 +181,15 @@ function tripleChanceCalc() {
 
   const S = odds.reduce((sum, q) => sum + 1 / q, 0);
 
+  const resultElem = document.getElementById("t-result");
+
   if (S >= 1) {
-    document.getElementById("t-result").innerHTML = `
-      ⚠️ এই অডস কম্বিনেশনে লাভের সুযোগ নেই (কভারেজ ${(S * 100).toFixed(1)}%)।
-      অন্তত একটা অডস বাড়িয়ে আবার চেষ্টা করুন।
-    `;
+    if (resultElem) {
+      resultElem.innerHTML = `
+        ⚠️ এই অডস কম্বিনেশনে লাভের সুযোগ নেই (কভারেজ ${(S * 100).toFixed(1)}%)।
+        অন্তত একটা অডস বাড়িয়ে আবার চেষ্টা করুন।
+      `;
+    }
     return;
   }
 
@@ -134,12 +203,14 @@ function tripleChanceCalc() {
     rows += `<tr><td>সিলেকশন ${i + 1} (অডস ${q})</td><td>${stakes[i].toFixed(2)}</td><td>${resultIfWin.toFixed(2)}</td></tr>`;
   });
 
-  document.getElementById("t-result").innerHTML = `
-    মোট স্টেক: <b>${totalStake.toFixed(2)}</b> (ক্যাপিটালের ${((totalStake / capital) * 100).toFixed(1)}%)<br>
-    <table class="t-table">
-      <tr><th>সিলেকশন</th><th>স্টেক</th><th>জিতলে ফলাফল</th></tr>
-      ${rows}
-    </table>
-    <p class="t-note">যেকোনো একটি সিলেকশন জিতলে ক্যাপিটাল প্রায় সমানভাবে বাড়বে। সবগুলো হারলে ক্যাপিটাল কমবে মোট স্টেক পরিমাণ।</p>
-  `;
+  if (resultElem) {
+    resultElem.innerHTML = `
+      মোট স্টেক: <b>${totalStake.toFixed(2)}</b> (ক্যাপিটালের ${((totalStake / capital) * 100).toFixed(1)}%)<br>
+      <table class="t-table">
+        <tr><th>সিলেকশন</th><th>স্টেক</th><th>জিতলে ফলাফল</th></tr>
+        ${rows}
+      </table>
+      <p class="t-note">যেকোনো একটি সিলেকশন জিতলে ক্যাপিটাল প্রায় সমানভাবে বাড়বে। সবগুলো হারলে ক্যাপিটাল কমবে মোট স্টেক পরিমাণ।</p>
+    `;
+  }
 }
