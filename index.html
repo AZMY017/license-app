@@ -53,44 +53,30 @@
 <script src="app.js"></script>
 
 <script>
-// প্রতিটা মোডের প্যানেল JS দিয়ে তৈরি — তিনটাই একই গঠন, শুধু নাম আলাদা
-function buildPanel(mode, title, note) {
+// প্রতিটা মোডের প্যানেল JS দিয়ে তৈরি। Classic-এ Target% ফিল্ড নেই
+// (N/K/Quota থেকে অটো-হিসাব হয়), Double/Triple-এ Target% ফিল্ড আছে।
+function buildPanel(mode, title, note, hasTarget) {
   return `
     <div id="panel-${mode}" class="card ${mode === "classic" ? "" : "hidden"}">
       <h2 style="font-size:1rem;margin-top:0;">${title}</h2>
       ${note ? `<p class="t-note" style="margin-top:0;">${note}</p>` : ""}
 
       <div id="${mode}-setup">
-        <div class="dash-block">
-          <div class="dash-header">⚙️ SETTINGS — শুধু হলুদ ঘরগুলো এডিট করুন</div>
-          <table class="dash-table">
-            <tr><td>Initial Capital</td><td><input class="amber-cell" type="number" id="${mode}-capital" placeholder="যেমনঃ 10000" /></td></tr>
-            <tr><td>Total Events (N)</td><td><input class="amber-cell" type="number" id="${mode}-events" placeholder="যেমনঃ 30" /></td></tr>
-            <tr><td>Required Wins (K)</td><td><input class="amber-cell" type="number" id="${mode}-wins" placeholder="যেমনঃ 5" /></td></tr>
-            <tr><td>Payout / Quota (per leg)</td><td><input class="amber-cell" type="number" step="0.01" id="${mode}-payout" placeholder="যেমনঃ 1.90" /></td></tr>
-            <tr><td>Target Profit % (of Initial Capital)</td><td><input class="amber-cell" type="number" step="0.1" id="${mode}-target" placeholder="যেমনঃ 1" /></td></tr>
-          </table>
-        </div>
-
-        <button class="btn-preview" onclick="previewCalc('${mode}')">📐 প্রিভিউ ক্যালকুলেট করুন</button>
-
-        <div id="${mode}-preview" class="hidden">
-          <div class="dash-block">
-            <div class="dash-header">📐 CALCULATED TARGETS</div>
-            <table class="dash-table calc-table">
-              <tr><td>Net Multiplier per Win</td><td id="${mode}-calc-multiplier">-</td></tr>
-              <tr><td>Target Final Capital</td><td id="${mode}-calc-target">-</td></tr>
-              <tr><td>Feasibility Check</td><td id="${mode}-calc-feasibility">-</td></tr>
-            </table>
-          </div>
-          <div class="dash-block">
-            <div class="dash-header">🎯 AUTO STAKE</div>
-            <div class="auto-stake-label">প্রথম ইভেন্টের স্টেক</div>
-            <div class="auto-stake-box" id="${mode}-calc-stake">-</div>
-          </div>
-          <div id="${mode}-calc-warning"></div>
-          <button class="btn-primary" onclick="startSession('${mode}')">▶️ সেশন / ট্র্যাকিং শুরু করুন</button>
-        </div>
+        <label>শুরুর ক্যাপিটাল</label>
+        <input type="number" id="${mode}-capital" placeholder="যেমনঃ 10000" />
+        <label>মোট ইভেন্ট সংখ্যা (N)</label>
+        <input type="number" id="${mode}-events" placeholder="যেমনঃ 20" />
+        <label>কয়টা জয় দরকার (K)</label>
+        <input type="number" id="${mode}-wins" placeholder="যেমনঃ 6" />
+        <label>পে-আউট / কোটা (প্রতি লেগের ডেসিমেল অডস)</label>
+        <input type="number" id="${mode}-payout" step="0.01" placeholder="যেমনঃ 1.85" />
+        ${
+          hasTarget
+            ? `<label>টার্গেট প্রফিট % (ইনিশিয়াল ক্যাপিটালের উপর)</label>
+               <input type="number" id="${mode}-target" step="0.1" placeholder="যেমনঃ 1" />`
+            : `<p class="t-note">এই মোডে টার্গেট নিজে থেকেই হিসাব হয় (N, K, Quota থেকে) — আলাদা করে দেওয়ার দরকার নেই।</p>`
+        }
+        <button class="btn-primary" onclick="startSession('${mode}')">সেশন শুরু করুন</button>
       </div>
 
       <div id="${mode}-play" class="hidden">
@@ -106,9 +92,9 @@ function buildPanel(mode, title, note) {
 }
 
 document.getElementById("panels-container").innerHTML =
-  buildPanel("classic", "Classic Masaniello", "প্রতিটা ইভেন্টে একটা মাত্র সিলেকশন।") +
-  buildPanel("double", "Double Chance Masaniello", "W = দুইটা লেগ-ই জিতলে তবেই জয় ধরা হবে।") +
-  buildPanel("triple", "Triple Chance Masaniello", "W = তিনটা লেগ-ই জিতলে তবেই জয় ধরা হবে।");
+  buildPanel("classic", "Classic Masaniello", "প্রতিটা ইভেন্টে একটা মাত্র সিলেকশন। টার্গেট অটো-হিসাব হয়।", false) +
+  buildPanel("double", "Double Chance Masaniello", "W = দুইটা লেগ-ই জিতলে তবেই জয় ধরা হবে।", true) +
+  buildPanel("triple", "Triple Chance Masaniello", "W = তিনটা লেগ-ই জিতলে তবেই জয় ধরা হবে।", true);
 
 function showMainApp() {
   document.getElementById("lock-screen").classList.add("hidden");
