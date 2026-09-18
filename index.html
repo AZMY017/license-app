@@ -3,24 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>License Key Lock System</title>
+  <title>License Key Lock & Money Management</title>
   
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
-  <!-- আপনার তৈরি করা Config File -->
+  <!-- Config File -->
   <script src="firebase-config.js"></script>
+  <link rel="stylesheet" href="style.css">
 
   <style>
     body {
       font-family: Arial, sans-serif;
       background-color: #f4f6f9;
+      margin: 0;
+      padding: 0;
+    }
+    .auth-container {
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
-      margin: 0;
+      min-height: 100vh;
     }
     .card {
       background: white;
@@ -60,20 +64,89 @@
 </head>
 <body>
 
-<div class="card" id="lock-screen">
-  <h2>সফটওয়্যার লাইসেন্স আনলক</h2>
-  <input type="text" id="license-input" placeholder="এখানে লাইসেন্স কী দিন">
-  <button onclick="verifyLicense()">আনলক করুন</button>
-  <p id="msg"></p>
+<!-- লাইসেন্স আনলক স্ক্রিন -->
+<div class="auth-container" id="lock-screen">
+  <div class="card">
+    <h2>সফটওয়্যার লাইসেন্স আনলক</h2>
+    <input type="text" id="license-input" placeholder="এখানে লাইসেন্স কী দিন">
+    <button onclick="verifyLicense()">আনলক করুন</button>
+    <p id="msg"></p>
+  </div>
 </div>
 
-<div class="card" id="app-screen" style="display: none;">
-  <h2 style="color: green;">স্বাগতম! 🎉</h2>
-  <p>আপনার লাইসেন্স কী সফলভাবে ভ্যালিডেট হয়েছে। অ্যাপটি এখন আনলকড!</p>
+<!-- মূল ট্রেডিং ও মানি ম্যানেজমেন্ট অ্যাপ (আনলক হওয়ার পর দেখাবে) -->
+<div id="app-screen" style="display: none; padding: 20px;">
+  <div class="container">
+    <header>
+      <h1>Masaniello Money Management</h1>
+      <p class="subtitle">আপনার ট্রেডিং এর ঝুঁকি নিয়ন্ত্রণ করুন দক্ষতার সাথে</p>
+    </header>
+
+    <!-- নেভিগেশন ট্যাব -->
+    <div class="tabs">
+      <button class="tab-btn active" data-type="classic">Classic Masaniello</button>
+      <button class="tab-btn" data-type="double">Double Chance</button>
+      <button class="tab-btn" data-type="triple">Triple Chance</button>
+    </div>
+
+    <!-- ইনপুট ফরম -->
+    <div class="card setup-card">
+      <h3>সেশন সেটআপ</h3>
+      <form id="setup-form">
+        <div class="form-group">
+          <label for="bankroll">শুরু করার ক্যাপিটাল ($ / ৳):</label>
+          <input type="number" id="bankroll" value="1000" step="any" required>
+        </div>
+        <div class="form-group">
+          <label for="events">মোট ট্রেড সংখ্যা (N):</label>
+          <input type="number" id="events" value="10" required>
+        </div>
+        <div class="form-group">
+          <label for="expectedWins">ন্যূনতম জয়ের লক্ষ্য (K):</label>
+          <input type="number" id="expectedWins" value="6" required>
+        </div>
+        <div class="form-group">
+          <label for="odds1">অডস/পে-আউট (Odds 1):</label>
+          <input type="number" id="odds1" value="1.85" step="0.01" required>
+        </div>
+        <div class="form-group extra-odds" id="odds2-group" style="display:none;">
+          <label for="odds2">অডস (Odds 2):</label>
+          <input type="number" id="odds2" value="1.85" step="0.01">
+        </div>
+        <div class="form-group extra-odds" id="odds3-group" style="display:none;">
+          <label for="odds3">অডস (Odds 3):</label>
+          <input type="number" id="odds3" value="1.85" step="0.01">
+        </div>
+        <button type="submit" class="btn primary">সেশন শুরু করুন</button>
+      </form>
+    </div>
+
+    <!-- সেশন ড্যাশবোর্ড -->
+    <div id="session-dashboard" style="display: none;">
+      <div class="card status-card">
+        <div class="status-grid">
+          <div><span>বর্তমান ক্যাপিটাল:</span> <strong id="current-bankroll">$0</strong></div>
+          <div><span>বাকি জয় দরকার:</span> <strong id="wins-needed">0</strong></div>
+          <div><span>বাকি ট্রেড:</span> <strong id="trades-left">0</strong></div>
+        </div>
+      </div>
+
+      <div class="card stake-card">
+        <h2>পরবর্তী ট্রেডের স্টেক (Stake):</h2>
+        <div class="stake-amount" id="next-stake">$0</div>
+        <div class="action-buttons">
+          <button id="btn-win" class="btn success-btn">✅ জিতেছি (WIN)</button>
+          <button id="btn-loss" class="btn danger-btn">❌ হেরেছি (LOSS)</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script src="app.js"></script>
 
 <script>
-  // ব্রাউজারের তৈরি করা একটি ইউনিক ডিভাইস আইডি
+  // ইউনিক ডিভাইস আইডি তৈরি
   function getDeviceId() {
     let deviceId = localStorage.getItem("device_id");
     if (!deviceId) {
@@ -83,7 +156,7 @@
     return deviceId;
   }
 
-  // অটো-লগইন চেক (যদি আগে থেকেই এই ডিভাইসে ভ্যালিড করা থাকে)
+  // অটো-লগইন চেক
   window.onload = function() {
     const savedKey = localStorage.getItem("active_license");
     if (savedKey) {
@@ -92,7 +165,7 @@
     }
   };
 
-  // লাইসেন্স ভ্যালিডেশন লজিক
+  // লাইসেন্স ভ্যালিডেশন
   async function verifyLicense() {
     const key = document.getElementById("license-input").value.trim();
     const msg = document.getElementById("msg");
@@ -119,7 +192,6 @@
 
       const data = doc.data();
 
-      // কেস ১: লাইসেন্স একদম নতুন (Unused)
       if (data.status === "unused") {
         await docRef.update({
           status: "used",
@@ -133,13 +205,11 @@
           document.getElementById("app-screen").style.display = "block";
         }, 1000);
       } 
-      // কেস ২: লাইসেন্সটি আগেই এই ডিভাইসে ব্যবহার করা হয়েছে
       else if (data.status === "used" && data.device_id === currentDeviceId) {
         localStorage.setItem("active_license", key);
         document.getElementById("lock-screen").style.display = "none";
         document.getElementById("app-screen").style.display = "block";
       } 
-      // কেস ৩: লাইসেন্সটি অন্য কোনো ডিভাইসে অ্যাক্টিভ করা আছে
       else {
         msg.className = "error";
         msg.innerText = "এই লাইসেন্স কী-টি অন্য ডিভাইসে ব্যবহৃত হচ্ছে!";
