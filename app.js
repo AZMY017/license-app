@@ -1,27 +1,102 @@
 // ==========================================================
-// ক্যালকুলেটর লজিক — Masaniello এবং Triple Chance
+// ক্যালকুলেটর লজিক — Masaniello এবং Triple/Double Chance
+// স্টেক ফর্মুলা এখন ক্লায়েন্টে নেই, Netlify Function থেকে হিসাব হয়ে আসে
 // ==========================================================
+
+const CALC_ENDPOINT = "/.netlify/functions/calculate-stake";
+
+// ---------------- ট্যাব সুইচিং ----------------
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      document.getElementById("masaniello-tab").classList.toggle("hidden", tab !== "masaniello");
+      document.getElementById("triple-tab").classList.toggle("hidden", tab !== "triple");
+    });
+  });
+
+  const savedKey = localStorage.getItem("active_license");
+  if (savedKey) {
+    document.getElementById("lock-screen").classList.add("hidden");
+    document.getElementById("app-screen").classList.remove("hidden");
+  }
+});
+
+// ---------------- ইউনিক ডিভাইস আইডি ----------------
+function getDeviceId() {
+  let deviceId = localStorage.getItem("device_id");
+  if (!deviceId) {
+    deviceId = "DEV-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+    localStorage.setItem("device_id", deviceId);
+  }
+  return deviceId;
+}
+
+// ---------------- লাইসেন্স ভ্যালিডেশন (transaction-safe) ----------------
+async function verifyLicense() {
+  const key = document.getElementById("license-input").value.trim();
+  const msg = document.getElementById("license-msg");
+  const currentDeviceId = getDeviceId();
+
+  if (!key) {
+    msg.className = "error-msg";
+    msg.innerText = "অনুগ্রহ করে লাইসেন্স কী টাইপ করুন!";
+    return;
+  }
+
+  msg.className = "";
+  msg.innerText = "যাচাই করা হচ্ছে...";
+
+  const docRef = db.collection("licenses").doc(key);
+
+  try {
+    // runTransaction ব্যবহার করা হয়েছে যাতে দুইজন একই মুহূর্তে একই কী দিয়ে
+    // চেষ্টা করলেও race condition না হয় (get + update আলাদাভাবে করলে যে ঝুঁকি ছিল)
+    await db.runTransaction(async (t) => {
+      const doc = await t.get(docRef);
+      if (!doc.exists) throw new Error("NOT_FOUND");
+
+      const data = doc.data();
+      if (data.status === "unused") {
+        t.update(docRef, { status: "used", device_id: currentDeviceId });
+      } else if (data.status === "used" && data.device_id === currentDeviceId) {
+        // এই ডিভাইসেই আগে অ্যাক্টিভ হয়েছিল, সমস্যা নেই
+      } else {
+        throw new Error("DEVICE_MISMATCH");
+      }
+    });
+
+    localStorage.setItem("active_license", key);
+    msg.className = "success-msg";
+    msg.innerText = "লাইসেন্স সফলভাবে অ্যাক্টিভ হয়েছে!";
+    setTimeout(() => {
+      document.getElementById("lock-screen").classList.add("hidden");
+      document.getElementById("app-screen").classList.remove("hidden");
+    }, 800);
+
+  } catch (err) {
+    msg.className = "error-msg";
+    if (err.message === "NOT_FOUND") {
+      msg.innerText = "ভুল লাইসেন্স কী!";
+    } else if (err.message === "DEVICE_MISMATCH") {
+      msg.innerText = "এই লাইসেন্স কী-টি অন্য ডিভাইসে ব্যবহৃত হচ্ছে!";
+    } else {
+      console.error(err);
+      msg.innerText = "ত্রুটি ঘটেছে! ইন্টারনেট চেক করুন বা সিকিউরিটি রুলস যাচাই করুন।";
+    }
+  }
+}
 
 // ---------------- Masaniello State ----------------
 let mState = null; // { capital, target, betsLeft, winsLeft, initialCapital }
 
-/**
- * Masaniello সেশন শুরু করার ফাংশন
- */
 function masanielloStart() {
-  const capitalElem = document.getElementById("m-capital");
-  const multiplierElem = document.getElementById("m-multiplier");
-  const betsElem = document.getElementById("m-bets");
-  const winsElem = document.getElementById("m-wins");
-
-  if (!capitalElem || !multiplierElem || !betsElem || !winsElem) {
-    return alert("প্রয়োজনীয় ইনপুট ফিল্ড খুঁজে পাওয়া যায়নি!");
-  }
-
-  const capital = parseFloat(capitalElem.value);
-  const multiplier = parseFloat(multiplierElem.value);
-  const totalBets = parseInt(betsElem.value, 10);
-  const winsNeeded = parseInt(winsElem.value, 10);
+  const capital = parseFloat(document.getElementById("m-capital").value);
+  const multiplier = parseFloat(document.getElementById("m-multiplier").value);
+  const totalBets = parseInt(document.getElementById("m-bets").value, 10);
+  const winsNeeded = parseInt(document.getElementById("m-wins").value, 10);
 
   if (!capital || capital <= 0) return alert("সঠিক ক্যাপিটাল দিন।");
   if (!multiplier || multiplier <= 1) return alert("টার্গেট মাল্টিপ্লায়ার ১ এর বেশি হতে হবে (যেমন ২)।");
@@ -37,67 +112,57 @@ function masanielloStart() {
     winsLeft: winsNeeded
   };
 
-  const setupElem = document.getElementById("m-setup");
-  const playElem = document.getElementById("m-play");
-
-  if (setupElem) setupElem.style.display = "none";
-  if (playElem) playElem.style.display = "block";
-
+  document.getElementById("m-setup").classList.add("hidden");
+  document.getElementById("m-play").classList.remove("hidden");
   renderMasanielloStatus();
 }
 
-/**
- * স্ট্যাটাস আপডেট রিঅ্যান্ডারিং
- */
 function renderMasanielloStatus() {
-  const statusElem = document.getElementById("m-status");
-  const resultElem = document.getElementById("m-stake-result");
-
-  if (statusElem) {
-    statusElem.innerHTML = `
-      বর্তমান ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b> |
-      টার্গেট: <b>${mState.target.toFixed(2)}</b> |
-      বাকি বেট: <b>${mState.betsLeft}</b> |
-      বাকি জয় দরকার: <b>${mState.winsLeft}</b>
-    `;
-  }
-  if (resultElem) resultElem.innerHTML = "";
+  document.getElementById("m-status").innerHTML = `
+    বর্তমান ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b> |
+    টার্গেট: <b>${mState.target.toFixed(2)}</b> |
+    বাকি বেট: <b>${mState.betsLeft}</b> |
+    বাকি জয় দরকার: <b>${mState.winsLeft}</b>
+  `;
+  document.getElementById("m-stake-result").innerHTML = "";
 }
 
-/**
- * স্টেক (Stake) হিসাব করার ফাংশন
- */
-function masanielloCalcStake() {
-  const oddsElem = document.getElementById("m-odds");
-  if (!oddsElem) return;
-
-  const odds = parseFloat(oddsElem.value);
+async function masanielloCalcStake() {
+  const odds = parseFloat(document.getElementById("m-odds").value);
   if (!odds || odds <= 1) return alert("সঠিক অডস দিন (১ এর বেশি)।");
   if (!mState || mState.winsLeft <= 0 || mState.betsLeft <= 0) return;
 
-  // r = এই ধাপে ক্যাপিটাল যতগুণ বাড়াতে হবে
-  const r = Math.pow(mState.target / mState.capital, 1 / mState.winsLeft);
-  let stake = (mState.capital * (r - 1)) / (odds - 1);
-
-  // স্টেক কখনো বর্তমান ক্যাপিটালের বেশি হতে পারবে না
-  if (stake > mState.capital) stake = mState.capital;
-  if (stake < 0) stake = 0;
-
-  mState._pendingStake = stake;
-  mState._pendingOdds = odds;
-
   const resultElem = document.getElementById("m-stake-result");
-  if (resultElem) {
+  resultElem.innerHTML = "হিসাব করা হচ্ছে...";
+
+  try {
+    const res = await fetch(CALC_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "classic",
+        capital: mState.capital,
+        targetCapital: mState.target,
+        winsLeft: mState.winsLeft,
+        odds
+      })
+    });
+    if (!res.ok) throw new Error("server error");
+    const data = await res.json();
+
+    mState._pendingStake = data.stake;
+    mState._pendingOdds = odds;
+
     resultElem.innerHTML = `
-      এই বেটে দিতে হবে: <b>${stake.toFixed(2)}</b> (অডস ${odds})<br>
-      জিতলে ক্যাপিটাল হবে প্রায়: <b>${(mState.capital - stake + stake * odds).toFixed(2)}</b>
+      এই বেটে দিতে হবে: <b>${data.stake.toFixed(2)}</b> (অডস ${odds})<br>
+      জিতলে ক্যাপিটাল হবে প্রায়: <b>${(mState.capital - data.stake + data.stake * odds).toFixed(2)}</b>
     `;
+  } catch (err) {
+    console.error(err);
+    resultElem.innerHTML = "স্টেক হিসাব করা যায়নি। ইন্টারনেট/সার্ভার চেক করুন।";
   }
 }
 
-/**
- * বেটের ফলাফল (Win / Loss) প্রসেস করার ফাংশন
- */
 function masanielloResult(won) {
   if (!mState || mState._pendingStake === undefined) return alert("আগে স্টেক ক্যালকুলেট করুন।");
 
@@ -110,66 +175,37 @@ function masanielloResult(won) {
   } else {
     mState.capital = mState.capital - stake;
   }
-
   mState.betsLeft -= 1;
   delete mState._pendingStake;
   delete mState._pendingOdds;
-
-  const oddsElem = document.getElementById("m-odds");
-  if (oddsElem) oddsElem.value = "";
-
-  const statusElem = document.getElementById("m-status");
-  const resultElem = document.getElementById("m-stake-result");
+  document.getElementById("m-odds").value = "";
 
   if (mState.winsLeft <= 0) {
-    if (statusElem) {
-      statusElem.innerHTML = `🎉 টার্গেট সম্পন্ন! ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
-    }
-    if (resultElem) resultElem.innerHTML = "";
+    document.getElementById("m-status").innerHTML = `🎉 টার্গেট সম্পন্ন! ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
+    document.getElementById("m-stake-result").innerHTML = "";
     return;
   }
-
   if (mState.betsLeft <= 0) {
-    if (statusElem) {
-      statusElem.innerHTML = `❌ বেট শেষ, টার্গেট পূরণ হয়নি। ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
-    }
-    if (resultElem) resultElem.innerHTML = "";
+    document.getElementById("m-status").innerHTML = `❌ বেট শেষ, টার্গেট পূরণ হয়নি। ফাইনাল ক্যাপিটাল: <b>${mState.capital.toFixed(2)}</b>`;
+    document.getElementById("m-stake-result").innerHTML = "";
     return;
   }
-
   renderMasanielloStatus();
 }
 
-/**
- * রিসেট করার ফাংশন
- */
 function masanielloReset() {
   mState = null;
-  const setupElem = document.getElementById("m-setup");
-  const playElem = document.getElementById("m-play");
-
-  if (setupElem) setupElem.style.display = "block";
-  if (playElem) playElem.style.display = "none";
+  document.getElementById("m-setup").classList.remove("hidden");
+  document.getElementById("m-play").classList.add("hidden");
 }
 
-// ---------------- Triple Chance ----------------
-/**
- * Triple Chance হিসাবের ফাংশন
- */
-function tripleChanceCalc() {
-  const capElem = document.getElementById("t-capital");
-  const multElem = document.getElementById("t-multiplier");
-  const o1Elem = document.getElementById("t-odds1");
-  const o2Elem = document.getElementById("t-odds2");
-  const o3Elem = document.getElementById("t-odds3");
-
-  if (!capElem || !multElem || !o1Elem || !o2Elem) return;
-
-  const capital = parseFloat(capElem.value);
-  const multiplier = parseFloat(multElem.value);
-  const o1 = parseFloat(o1Elem.value);
-  const o2 = parseFloat(o2Elem.value);
-  const o3raw = o3Elem ? o3Elem.value : null;
+// ---------------- Triple / Double Chance ----------------
+async function tripleChanceCalc() {
+  const capital = parseFloat(document.getElementById("t-capital").value);
+  const multiplier = parseFloat(document.getElementById("t-multiplier").value);
+  const o1 = parseFloat(document.getElementById("t-odds1").value);
+  const o2 = parseFloat(document.getElementById("t-odds2").value);
+  const o3raw = document.getElementById("t-odds3").value;
   const o3 = o3raw ? parseFloat(o3raw) : null;
 
   if (!capital || capital <= 0) return alert("সঠিক ক্যাপিটাল দিন।");
@@ -179,38 +215,46 @@ function tripleChanceCalc() {
   const odds = [o1, o2];
   if (o3 && o3 > 1) odds.push(o3);
 
-  const S = odds.reduce((sum, q) => sum + 1 / q, 0);
-
   const resultElem = document.getElementById("t-result");
+  resultElem.innerHTML = "হিসাব করা হচ্ছে...";
 
-  if (S >= 1) {
-    if (resultElem) {
-      resultElem.innerHTML = `
-        ⚠️ এই অডস কম্বিনেশনে লাভের সুযোগ নেই (কভারেজ ${(S * 100).toFixed(1)}%)।
-        অন্তত একটা অডস বাড়িয়ে আবার চেষ্টা করুন।
-      `;
+  try {
+    const res = await fetch(CALC_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode: "multi",
+        capital,
+        targetCapital: capital * multiplier,
+        odds
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.error === "NO_EDGE") {
+        resultElem.innerHTML = `⚠️ এই অডস কম্বিনেশনে লাভের সুযোগ নেই। অন্তত একটা অডস বাড়িয়ে আবার চেষ্টা করুন।`;
+        return;
+      }
+      throw new Error(errData.error || "server error");
     }
-    return;
-  }
+    const data = await res.json();
 
-  const r = multiplier; // এই একবারের ধাপে যতগুণ ক্যাপিটাল বাড়ানোর টার্গেট
-  const totalStake = (capital * (r - 1) * S) / (1 - S);
-  const stakes = odds.map((q) => (capital * (r - 1) + totalStake) / q);
+    let rows = "";
+    odds.forEach((q, i) => {
+      rows += `<tr><td>সিলেকশন ${i + 1} (অডস ${q})</td><td>${data.stakes[i].toFixed(2)}</td><td>${data.resultIfWin[i].toFixed(2)}</td></tr>`;
+    });
 
-  let rows = "";
-  odds.forEach((q, i) => {
-    const resultIfWin = capital - totalStake + stakes[i] * q;
-    rows += `<tr><td>সিলেকশন ${i + 1} (অডস ${q})</td><td>${stakes[i].toFixed(2)}</td><td>${resultIfWin.toFixed(2)}</td></tr>`;
-  });
-
-  if (resultElem) {
     resultElem.innerHTML = `
-      মোট স্টেক: <b>${totalStake.toFixed(2)}</b> (ক্যাপিটালের ${((totalStake / capital) * 100).toFixed(1)}%)<br>
+      মোট স্টেক: <b>${data.totalStake.toFixed(2)}</b> (ক্যাপিটালের ${((data.totalStake / capital) * 100).toFixed(1)}%)<br>
       <table class="t-table">
         <tr><th>সিলেকশন</th><th>স্টেক</th><th>জিতলে ফলাফল</th></tr>
         ${rows}
       </table>
       <p class="t-note">যেকোনো একটি সিলেকশন জিতলে ক্যাপিটাল প্রায় সমানভাবে বাড়বে। সবগুলো হারলে ক্যাপিটাল কমবে মোট স্টেক পরিমাণ।</p>
     `;
+  } catch (err) {
+    console.error(err);
+    resultElem.innerHTML = "স্টেক হিসাব করা যায়নি। ইন্টারনেট/সার্ভার চেক করুন।";
   }
 }
