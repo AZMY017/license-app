@@ -13,6 +13,6 @@ const firebaseConfig = {
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-
+const auth = firebase.auth();
 // অ্যাডমিন ইমেইল
 const ADMIN_EMAIL = "azmyislam8@gmail.com";
