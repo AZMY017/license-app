@@ -6,9 +6,6 @@
   --danger: #ef4444;
   --text: #eef1f8;
   --muted: #9aa4bf;
-  --navy: #0b1f3a;
-  --amber: #ffdd99;
-  --amber-dark: #f2b134;
   font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -54,53 +51,148 @@ button {
 .btn-lose { background: var(--danger); color: white; }
 .btn-secondary { background: #2c3352; color: var(--text); }
 .row-2 { display: flex; gap: 10px; }
-.row-2 button { flex: 1; }
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
-.tab-btn {
-  flex: 1; background: var(--card); color: var(--muted);
-  padding: 10px; border-radius: 10px; text-align: center; cursor: pointer;
-  font-size: 0.9rem; margin-top: 0;
-}
-.tab-btn.active { background: var(--accent); color: white; }
-.hidden { display: none; }
-#m-status, #t-result, #m-stake-result {
-  margin-top: 10px; font-size: 0.9rem; line-height: 1.6;
-}
-.t-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
-.t-table th, .t-table td { border-bottom: 1px solid #2c3352; padding: 6px; text-align: left; }
+.row-2 button { flex: 1; margin-top: 0; }
+.hidden { display: none !important; }
 .t-note { color: var(--muted); font-size: 0.8rem; margin-top: 8px; }
 .lock-screen { text-align: center; padding-top: 60px; }
 .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 8px; }
 .success-msg { color: var(--accent2); font-size: 0.85rem; margin-top: 8px; }
 footer { text-align: center; color: var(--muted); font-size: 0.75rem; margin-top: 20px; }
 
-/* ================= Dashboard: Settings / Calculated Targets / Auto Stake ================= */
-.dash-block { border-radius: 10px; overflow: hidden; margin-top: 14px; border: 1px solid #2c3352; }
-.dash-header {
-  background: var(--navy); color: #fff; font-weight: 700;
-  font-size: 0.8rem; padding: 8px 12px; letter-spacing: 0.3px;
+/* ==================================================================
+   MAIN MENU — 3 option selector shown right after unlock
+   ================================================================== */
+.menu-options { display: flex; flex-direction: column; gap: 12px; }
+.menu-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, #1a1f35, #222a48);
+  border: 1px solid #2c3352;
+  border-radius: 14px;
+  padding: 16px;
+  cursor: pointer;
+  transition: transform .12s ease, border-color .12s ease;
 }
-.dash-table { width: 100%; border-collapse: collapse; background: #12172c; }
-.dash-table td { padding: 8px 10px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: middle; }
-.dash-table td:first-child { color: var(--muted); width: 55%; }
-.dash-table input.amber-cell {
-  width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--amber-dark);
-  background: var(--amber); color: #3a2a00; font-weight: 700; font-size: 0.85rem;
-  margin: 0;
+.menu-card:active { transform: scale(0.98); }
+.menu-card .icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; flex-shrink: 0;
 }
-.calc-table td:last-child { font-weight: 700; color: var(--text); text-align: right; }
-.feasible-yes { color: var(--accent2) !important; }
-.feasible-no { color: var(--danger) !important; }
-.auto-stake-box {
-  background: #123c22; color: #7dffb3; text-align: center; font-size: 1.35rem;
-  font-weight: 800; padding: 14px; margin: 0;
+.menu-card.mc-classic .icon { background: linear-gradient(135deg,#f2994a,#c0392b); }
+.menu-card.mc-classic { border-color: #c0392b55; }
+.menu-card.mc-double .icon, .menu-card.mc-triple .icon { background: linear-gradient(135deg,#1e3a6e,#0b2447); }
+.menu-card.mc-double { border-color: #1e3a6e55; }
+.menu-card.mc-triple { border-color: #1e3a6e55; }
+.menu-card .mc-text { flex: 1; }
+.menu-card .mc-title { font-weight: 700; font-size: 1rem; margin-bottom: 2px; }
+.menu-card .mc-desc { font-size: 0.78rem; color: var(--muted); }
+.menu-card .mc-arrow { color: var(--muted); font-size: 1.2rem; }
+
+/* ==================================================================
+   DASHBOARD — Excel-style layout, shared structure, two color themes
+   ================================================================== */
+.dash-topbar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
 }
-.auto-stake-label {
-  text-align: center; color: var(--muted); font-size: 0.75rem;
-  padding: 6px 0 0; background: #12172c;
+.back-btn {
+  width: auto; margin-top: 0; padding: 8px 12px; font-size: 0.8rem;
+  background: #2c3352; color: var(--text); flex-shrink: 0;
 }
-.btn-preview { background: var(--amber-dark); color: #241900; margin-top: 14px; }
-.warn-box {
-  background: #3a2a00; color: #ffcf5c; font-size: 0.8rem;
-  padding: 10px 12px; border-radius: 8px; margin-top: 10px;
+.dashboard { border-radius: 14px; overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 18px rgba(0,0,0,0.35); }
+
+.dash-title {
+  padding: 14px 16px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+  text-align: center;
 }
+
+.panel { background: #ffffff; }
+.panel + .panel { border-top: 3px solid rgba(0,0,0,0.08); }
+.panel-title {
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  display: flex; align-items: center; gap: 6px;
+}
+.excel-table { width: 100%; border-collapse: collapse; }
+.excel-table td, .excel-table th { padding: 8px 12px; font-size: 0.82rem; color: #23262f; }
+.excel-table td:first-child { color: #33363f; }
+.excel-row-label { text-align: left; width: 58%; }
+.excel-row-value { text-align: right; font-weight: 700; color: #14161c; }
+.excel-table input.amber-cell {
+  width: 100%; text-align: right; border: none; border-radius: 6px;
+  padding: 6px 8px; font-size: 0.85rem; font-weight: 700; color: #1a1a1a;
+}
+.excel-table tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+
+.dash-actions { padding: 12px 14px 16px; background: #ffffff; }
+.dash-actions button { margin-top: 0; }
+
+.event-table-wrap { max-height: 46vh; overflow-y: auto; background: #fff; }
+.event-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+.event-table th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 8px 6px; font-size: 0.7rem; text-align: center;
+}
+.event-table td { padding: 7px 6px; text-align: center; border-bottom: 1px solid #eee; white-space: nowrap; }
+.event-table tr.row-current td { font-weight: 800; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.25); }
+.event-table tr.row-win td { background: #d7f5df; color: #1b6e34; }
+.event-table tr.row-lose td { background: #fbd6d3; color: #a02622; }
+.event-table tr.row-preview td { color: #5a5f6e; }
+
+.win-loss-row { display: flex; gap: 10px; padding: 12px 14px 16px; background: #fff; }
+.win-loss-row button { margin-top: 0; }
+
+.stat-box {
+  text-align: center; border-radius: 8px; padding: 10px 8px; font-weight: 800; font-size: 1.05rem;
+}
+.stat-box .stat-label { font-size: 0.68rem; font-weight: 600; margin-bottom: 4px; display: block; }
+
+/* ---------- CLASSIC THEME: red / orange (Excel "Configura Masaniello" look) ---------- */
+.theme-classic .dash-title { background: linear-gradient(135deg,#c0392b,#e67e22); color: #fff; }
+.theme-classic .panel-title.pt-settings { background: #f2994a; color: #3b1d00; }
+.theme-classic .panel.p-settings { background: #fdeadb; }
+.theme-classic .panel.p-settings .excel-table td { background: transparent; }
+.theme-classic .excel-table input.amber-cell { background: #fcd9a8; }
+.theme-classic .panel-title.pt-results { background: #f2994a; color: #3b1d00; }
+.theme-classic .panel.p-results { background: #fdeadb; }
+.theme-classic .panel-title.pt-sequence { background: #e0784a; color: #fff; }
+.theme-classic .panel.p-sequence { background: #fdeadb; }
+.theme-classic .stat-box.win { background: #d7f5df; color: #1b6e34; }
+.theme-classic .stat-box.lose { background: #fbd6d3; color: #a02622; }
+.theme-classic .event-table th { background: #e0784a; color: #fff; }
+.theme-classic .event-table tr:nth-child(even) td { background: #fdf1e6; }
+.theme-classic .dash-actions { background: #fdeadb; }
+.theme-classic .win-loss-row { background: #fdeadb; }
+
+/* ---------- DOUBLE / TRIPLE THEME: navy blue + amber (Excel "Dashboard" look) ---------- */
+.theme-navy .dash-title { background: #0b2447; color: #fff; }
+.theme-navy .panel-title.pt-settings { background: #123b6b; color: #fff; }
+.theme-navy .panel.p-settings { background: #eef2f8; }
+.theme-navy .excel-table input.amber-cell { background: #fcd980; }
+.theme-navy .panel-title.pt-results { background: #123b6b; color: #fff; }
+.theme-navy .panel.p-results { background: #eef2f8; }
+.theme-navy .panel-title.pt-stake { background: #0b2447; color: #fff; }
+.theme-navy .panel.p-stake { background: #eef2f8; }
+.theme-navy .stat-box.win { background: #d7f5df; color: #1b6e34; border: 1px solid #9be3ad; }
+.theme-navy .stat-box.lose { background: #fbd6d3; color: #a02622; }
+.theme-navy .event-table th { background: #0b2447; color: #fff; }
+.theme-navy .event-table tr:nth-child(even) td { background: #eef2f8; }
+.theme-navy .dash-actions { background: #eef2f8; }
+.theme-navy .win-loss-row { background: #eef2f8; }
+
+.feasible-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 800;
+}
+.feasible-badge.yes { background: #d7f5df; color: #1b6e34; }
+.feasible-badge.no { background: #fbd6d3; color: #a02622; }
+
+.end-banner {
+  margin: 0 14px 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; font-weight: 700; text-align: center;
+}
+.end-banner.achieved { background: #d7f5df; color: #1b6e34; }
+.end-banner.failed { background: #fbd6d3; color: #a02622; }
